@@ -1,0 +1,15 @@
+schema_version: 0.0.1 # The version for manifest.yaml schema
+
+# The name used for this language pack repository when referenced
+# in the UX, and its version
+name: default
+version: 0.0.1
+
+buildEnvs:
+  - name: BP_NATIVE_IMAGE
+    value: "false"
+  - name: BP_JVM_VERSION
+    value: "17"
+
+builderImages:
+  pack: gcr.io/paketo-buildpacks/builder:base
