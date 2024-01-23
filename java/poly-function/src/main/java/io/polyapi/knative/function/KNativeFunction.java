@@ -15,10 +15,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -55,17 +52,11 @@ public class KNativeFunction {
     }
 
     @Bean
-    public Function<Message<String>, Message<String>> execute() {
-        return Function.<Message<String>>identity()
-                .andThen(this::process)
-                .andThen(result -> MessageBuilder.withPayload(Optional.ofNullable(result)
-                                .map(jsonParser::toJsonString)
-                                .orElse(""))
-                        .copyHeaders(result instanceof Number ? Map.of() : Map.of("Content-Type", "application/json"))
-                        .build());
+    public Function<Message<String>, Message<?>> execute() {
+        return this::process;
     }
 
-    private Object process(Message<String> inputMessage) {
+    private Message<?> process(Message<String> inputMessage) {
         boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
                 .map(Object::toString)
                 .map(Boolean::getBoolean)
@@ -75,39 +66,35 @@ public class KNativeFunction {
         logger.debug("Executing function with payload {}.", inputMessage.getPayload());
         FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
         Object function = functionSupplier.get();
-        Object result = Arrays.stream(function.getClass().getDeclaredMethods())
+        Message<?> result = Arrays.stream(function.getClass().getDeclaredMethods())
                 .filter(method -> method.getName().equals("execute"))
                 .findFirst()
                 .map(executeMethod -> {
                     try {
                         logger.debug("Executing method '{}'", executeMethod);
-                        Parameter[] parameters = executeMethod.getParameters();
                         return Optional.ofNullable(executeMethod.invoke(function,
                                         range(0, arguments.size()).boxed()
-                                                .map(i -> Optional.ofNullable(arguments.get(i))
-                                                        .filter(Number.class::isInstance)
-                                                        .map(Object::toString)
-                                                        .map(switch (parameters[i].getType().getName()) {
-                                                            case "java.lang.Integer" -> Integer::valueOf;
-                                                            case "java.lang.Long" -> Long::valueOf;
-                                                            case "java.lang.Double" -> Double::valueOf;
-                                                            case "java.lang.Float" -> Float::valueOf;
-                                                            case "java.lang.Short" -> Short::valueOf;
-                                                            case "java.lang.Byte" -> Byte::valueOf;
-                                                            default -> Function.<Object>identity();
-                                                        })
-                                                        .orElse(arguments.get(i)))
-                                                .toArray()));
+                                                .map(i -> jsonParser.parseString(arguments.get(i).toString(), executeMethod.getParameters()[i].getParameterizedType()))
+                                                .toArray()))
+                                .orElse("");
                     } catch (InvocationTargetException e) {
                         throw new FunctionInvocationException(e);
                     } catch (IllegalAccessException e) {
                         throw new ExecuteMethodNotFoundException(executeMethod, e);
                     } catch (ArrayIndexOutOfBoundsException | IllegalArgumentException e) {
-                        throw new WrongNumberOfArgumentsException(executeMethod, arguments, e);
+                        throw new WrongArgumentsException(executeMethod, arguments, e);
                     }
                 })
-                .orElseThrow(ExecuteMethodNotFoundException::new)
-                .orElse(null);
+                .map(methodResult -> {
+                    if (methodResult instanceof Number || methodResult instanceof String) {
+                        return MessageBuilder.withPayload(methodResult).build();
+                    } else {
+                        return MessageBuilder.withPayload(jsonParser.toJsonString(methodResult))
+                                .setHeader("Content-Type", "application/json")
+                                .build();
+                    }
+                })
+                .orElseThrow(ExecuteMethodNotFoundException::new);
         logger.debug("Execution successful.");
         if (logger.isTraceEnabled()) {
             logger.trace("Response body is:\n {}", jsonParser.toJsonString(result));

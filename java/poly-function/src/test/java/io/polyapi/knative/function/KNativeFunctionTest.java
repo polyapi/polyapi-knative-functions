@@ -2,11 +2,10 @@ package io.polyapi.knative.function;
 
 import io.polyapi.commons.api.error.PolyApiException;
 import io.polyapi.commons.api.error.parse.JsonToObjectParsingException;
-import io.polyapi.commons.api.error.parse.ObjectToJsonParsingException;
 import io.polyapi.commons.api.json.JsonParser;
 import io.polyapi.commons.internal.json.JacksonJsonParser;
-import io.polyapi.knative.function.error.PolyKNativeFunctionException;
-import io.polyapi.knative.function.error.function.WrongNumberOfArgumentsException;
+import io.polyapi.knative.function.error.function.WrongArgumentsException;
+import io.polyapi.knative.function.mock.InnerClassParameterFunction;
 import io.polyapi.knative.function.mock.MockPolyCustomFunction;
 import io.polyapi.knative.function.mock.MockSingleParameterProcess;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,9 +40,10 @@ public class KNativeFunctionTest {
     }
 
     public static Stream<Arguments> processTestSource() {
-        return Stream.of(Arguments.of("Case 1: Empty JSon message & no headers.", new MockPolyCustomFunction(), "{}", DEFAULT_SUCCESSFUL_RESULT, null, DEFAULT_CONTENT_TYPE_HEADERS),
-                Arguments.of("Case 2: Number value to String parameter.", new MockSingleParameterProcess(param -> assertThat(param, equalTo("1"))), createBody(1), DEFAULT_SUCCESSFUL_RESULT, null, DEFAULT_CONTENT_TYPE_HEADERS),
-                Arguments.of("Case 3: Default reflection generation of custom function.", null, "{}", DEFAULT_SUCCESSFUL_RESULT, null, DEFAULT_CONTENT_TYPE_HEADERS));
+        return Stream.of(Arguments.of("Case 1: Empty JSon message & no headers.", new MockPolyCustomFunction(), "{}", DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
+                Arguments.of("Case 2: Number value to String parameter.", new MockSingleParameterProcess(param -> assertThat(param, equalTo(1))), createBody(1), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
+                Arguments.of("Case 3: Default reflection generation of custom function.", null, "{}", DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
+                Arguments.of("Case 4: Inner class parameter.", new InnerClassParameterFunction(), "{\"args\":[{\"name\":\"test\"}]}", "test", null, Map.of()));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -73,12 +73,12 @@ public class KNativeFunctionTest {
 
     public static Stream<Arguments> processErrorTestSource() {
         return Stream.of(Arguments.of("Error case 1: Invalid JSon body.", new MockPolyCustomFunction(), "", null, JsonToObjectParsingException.class, "An error occurred while parsing JSon to io.polyapi.knative.function.model.FunctionArguments."),
-                Arguments.of("Error case 2: Too many parameters.", new MockPolyCustomFunction(), createBody("test"), null, WrongNumberOfArgumentsException.class, "Wrong type of arguments for poly server function. Expected () but got (java.lang.String)."),
-                Arguments.of("Error case 3: Too few parameters.", new MockSingleParameterProcess(), createBody(), null, WrongNumberOfArgumentsException.class, "Wrong type of arguments for poly server function. Expected (java.lang.String) but got ()."),
-                Arguments.of("Error case 4: Parameter type mismatch.", new MockSingleParameterProcess(), createBody(TRUE), null, WrongNumberOfArgumentsException.class, "Wrong type of arguments for poly server function. Expected (java.lang.String) but got (java.lang.Boolean)."),
+                Arguments.of("Error case 2: Too many parameters.", new MockPolyCustomFunction(), createBody("test"), null, WrongArgumentsException.class, "Wrong type of arguments for poly server function. Expected ()."),
+                Arguments.of("Error case 3: Too few parameters.", new MockSingleParameterProcess(), createBody(), null, WrongArgumentsException.class, "Wrong type of arguments for poly server function. Expected (java.lang.Integer)."),
+                Arguments.of("Error case 4: Parameter type mismatch.", new MockSingleParameterProcess(), createBody(TRUE), null, JsonToObjectParsingException.class, "An error occurred while parsing JSon to java.lang.Integer."),
                 Arguments.of("Error case 5: Exception thrown during execution of function.", new MockSingleParameterProcess(param -> {
                     throw new RuntimeException("Sample message");
-                }), createBody("test"), null, RuntimeException.class, "An error occurred while executing function: RuntimeException: Sample message"));
+                }), createBody(1), null, RuntimeException.class, "An error occurred while executing function: RuntimeException: Sample message"));
     }
 
     @ParameterizedTest(name = "{0}")

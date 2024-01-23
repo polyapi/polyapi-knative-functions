@@ -7,17 +7,17 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 public class MockSingleParameterProcess {
 
-    private final Consumer<String> assertionsBlock;
+    private final Consumer<Integer> assertionsBlock;
 
     public MockSingleParameterProcess() {
         this(param -> assertThat(param, notNullValue()));
     }
 
-    public MockSingleParameterProcess(Consumer<String> assertionsBlock) {
+    public MockSingleParameterProcess(Consumer<Integer> assertionsBlock) {
         this.assertionsBlock = assertionsBlock;
     }
 
-    public void execute(String param) {
+    public void execute(Integer param) {
         assertionsBlock.accept(param);
     }
 }
