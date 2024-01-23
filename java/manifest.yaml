@@ -13,3 +13,8 @@ buildEnvs:
 
 builderImages:
   pack: gcr.io/paketo-buildpacks/builder:base
+
+deploy:
+  healthEndpoints:
+    liveness: /actuator/health
+    readiness: /actuator/health
