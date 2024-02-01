@@ -8,7 +8,7 @@
     </parent>
     <groupId>io.polyapi</groupId>
     <artifactId>knative.function</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <name>Poly function</name>
     <description>A Poly function to be executed on the server</description>
     <properties>
