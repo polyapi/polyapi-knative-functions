@@ -10,11 +10,7 @@ public class MockSingleParameterProcess {
     private final Consumer<Integer> assertionsBlock;
 
     public MockSingleParameterProcess() {
-        this(param -> assertThat(param, notNullValue()));
-    }
-
-    public MockSingleParameterProcess(Consumer<Integer> assertionsBlock) {
-        this.assertionsBlock = assertionsBlock;
+        this.assertionsBlock = param -> assertThat(param, notNullValue());
     }
 
     public void execute(Integer param) {
