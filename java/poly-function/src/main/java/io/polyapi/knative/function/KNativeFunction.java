@@ -11,7 +11,6 @@ import io.polyapi.knative.function.error.function.execution.WrongArgumentsExcept
 import io.polyapi.knative.function.error.function.state.*;
 import io.polyapi.knative.function.log.PolyLogStream;
 import io.polyapi.knative.function.model.FunctionArguments;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -34,12 +33,11 @@ import static java.util.function.Predicate.not;
 import static java.util.stream.IntStream.range;
 
 @SpringBootApplication
-@Setter
 public class KNativeFunction {
     private final static Logger logger = LoggerFactory.getLogger(KNativeFunction.class);
     private final String propertiesFile;
 
-    private JsonParser jsonParser = new JacksonJsonParser();
+    private final JsonParser jsonParser = new JacksonJsonParser();
 
     public static void main(String[] args) {
         SpringApplication.run(KNativeFunction.class, args);
@@ -68,13 +66,13 @@ public class KNativeFunction {
             System.setErr(new PolyLogStream(System.err, "ERROR", loggingEnabled));
             Properties properties = new Properties();
             logger.info("Obtaining configuration from {} file.", propertiesFile);
-            properties.load(KNativeFunction.class.getResourceAsStream(propertiesFile));
+            properties.load(Optional.ofNullable(propertiesFile).map(KNativeFunction.class::getResourceAsStream).orElseThrow(() -> new ConfigurationPropertiesFileNotFoundException(propertiesFile)));
             logger.debug("Configuration retrieved successfully.");
-            String functionQualifiedName = properties.getProperty("polyapi.function.class");
+            String functionQualifiedName = properties.getProperty("polyapi.function.class", "");
             logger.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             logger.debug("Class {} loaded successfully.", functionQualifiedName);
-            String parameterTypes = properties.getProperty("polyapi.function.params");
+            String parameterTypes = properties.getProperty("polyapi.function.params", "");
             logger.info("Loading parameter types: [{}].", parameterTypes);
             Class<?>[] paramTypes = Optional.ofNullable(parameterTypes)
                     .filter(not(String::isBlank))
@@ -94,7 +92,7 @@ public class KNativeFunction {
                     })
                     .toArray(Class<?>[]::new);
             logger.debug("Parameter types loaded successfully.");
-            String methodName = properties.getProperty("polyapi.function.method");
+            String methodName = properties.getProperty("polyapi.function.method", "");
             try {
                 logger.info("Retrieving method {}.{}({}).", functionQualifiedName, methodName, parameterTypes);
                 Method functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
@@ -160,8 +158,8 @@ public class KNativeFunction {
             }
         } catch (ClassNotFoundException e) {
             throw new PolyFunctionNotFoundException(e);
-        } catch (IOException e) {
-            throw new ConfigurationPropertiesNotFoundException(e);
+        } catch (IllegalArgumentException | IOException e) {
+            throw new InvalidConfigurationPropertiesFileException(this.propertiesFile, e);
         }
     }
 }
