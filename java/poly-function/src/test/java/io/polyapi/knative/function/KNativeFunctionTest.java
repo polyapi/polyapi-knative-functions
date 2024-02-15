@@ -57,16 +57,17 @@ public class KNativeFunctionTest {
                 Arguments.of("Properties file without parameter property. Should find any match by name.", "Case 7", CREATE_FROM_CASE, createBody(), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
                 Arguments.of("No Properties file.", "Case 8", CREATE_FROM_CASE, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
                 Arguments.of("Properties file without method name property. Defaults to execute.", "Case 9", CREATE_FROM_CASE, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
-                Arguments.of("Properties file without class name property. Defaults to PolyCustomFunction.", "Case 10", CREATE_FROM_CASE, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()));
+                Arguments.of("Properties file without class name property. Defaults to PolyCustomFunction.", "Case 10", CREATE_FROM_CASE, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, null, Map.of()),
+                Arguments.of("Number returning function.", "Case 11", CREATE_FROM_CASE, createBody(), 1, null, Map.of()));
     }
 
     @ParameterizedTest(name = "{1}: {0}")
     @MethodSource("processTestSource")
-    public void processSuccessfulTest(String description, String caseName, Function<String, KNativeFunction> creationStrategy, String payload, String expectedPayload, Map<String, Object> headers, Map<String, Object> expectedHeaders) throws IOException {
+    public void processSuccessfulTest(String description, String caseName, Function<String, KNativeFunction> creationStrategy, String payload, Object expectedPayload, Map<String, Object> headers, Map<String, Object> expectedHeaders) throws IOException {
         processTest(description, caseName, creationStrategy, payload, expectedPayload, headers, expectedHeaders);
     }
 
-    public void processTest(String description, String caseName, Function<String, KNativeFunction> creationStrategy, String payload, String expectedPayload, Map<String, Object> headers, Map<String, Object> expectedHeaders) throws IOException {
+    public void processTest(String description, String caseName, Function<String, KNativeFunction> creationStrategy, String payload, Object expectedPayload, Map<String, Object> headers, Map<String, Object> expectedHeaders) throws IOException {
         String caseTitle = format("- %s: %s -", caseName.toUpperCase(), description);
         String titleSeparator = range(0, caseTitle.length()).boxed().map(i -> "-").collect(joining());
         logger.info("\n{}", titleSeparator);
@@ -100,7 +101,9 @@ public class KNativeFunctionTest {
                 Arguments.of("Expected exception.", "Error case 12", CREATE_FROM_CASE, createBody(), null, PolyApiExecutionExceptionWrapperException.class, 42, "An error occurred while executing function: (No root exception): No message."),
                 Arguments.of("Private execution method.", "Error case 13", CREATE_FROM_CASE, createBody(), null, ExecutionMethodNotAccessibleException.class, 501, "The execution method 'private void io.polyapi.knative.function.mock.MockPrivateExecutionMethodFunction.execute()' is not accessible is not accessible for the application. Please review the access modifier."),
                 Arguments.of("Non existing argument type.", "Error case 14", CREATE_FROM_CASE, createBody(), null, InvalidArgumentTypeException.class, 501, "Argument of type i.dont.exist.as.AType cannot be resolved by the server. Please make sure that the function is properly set."),
-                Arguments.of("Properties file with malformed unicode escape character.", "Error case 16", CREATE_FROM_CASE, createBody(), null, InvalidConfigurationPropertiesFileException.class, 501, "File '/io/polyapi/knative/function/cases/KNativeFunctionTest-Error case 16.properties' containing the configuration of the server function is invalid."));
+                Arguments.of("Properties file with malformed unicode escape character.", "Error case 16", CREATE_FROM_CASE, createBody(), null, InvalidConfigurationPropertiesFileException.class, 501, "File '/io/polyapi/knative/function/cases/KNativeFunctionTest-Error case 16.properties' containing the configuration of the server function is invalid."),
+                Arguments.of("Default class name with non existing method name.", "Error case 17", CREATE_FROM_CASE, createBody(), null, ExecutionMethodNotFoundException.class, 501, "Method 'nonExistingMethod()' is not accessible from function server class."),
+                Arguments.of("Default class name and not set parameter types with non existing method name.", "Error case 18", CREATE_FROM_CASE, createBody(), null, ExecutionMethodNotFoundException.class, 501, "Method 'nonExistingMethod()' is not accessible from function server class."));
     }
 
     @ParameterizedTest(name = "{1}: {0}")

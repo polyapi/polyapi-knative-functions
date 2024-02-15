@@ -7,10 +7,8 @@ import static java.lang.String.format;
 
 @Getter
 public class InvalidArgumentTypeException extends PolyFunctionStateException {
-    private final String typeQualifiedName;
 
     public InvalidArgumentTypeException(String typeQualifiedName, Throwable cause) {
         super(format("Argument of type %s cannot be resolved by the server. Please make sure that the function is properly set.", typeQualifiedName), cause);
-        this.typeQualifiedName = typeQualifiedName;
     }
 }

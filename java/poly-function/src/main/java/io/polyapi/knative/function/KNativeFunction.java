@@ -69,14 +69,10 @@ public class KNativeFunction {
             logger.info("Obtaining configuration from {} file.", propertiesFile);
             Optional.ofNullable(propertiesFile).ifPresent(file -> {
                 try (InputStream inputStream = KNativeFunction.class.getResourceAsStream(file)) {
-                    Optional.ofNullable(inputStream).ifPresent(stream -> {
-                        try {
-                            properties.load(stream);
-                        } catch (IllegalArgumentException | IOException e) {
-                            throw new InvalidConfigurationPropertiesFileException(this.propertiesFile, e);
-                        }
-                    });
-                } catch (IOException e) {
+                    if (inputStream != null) {
+                        properties.load(inputStream);
+                    }
+                } catch (IllegalArgumentException | IOException e) {
                     throw new InvalidConfigurationPropertiesFileException(this.propertiesFile, e);
                 }
             });
@@ -150,9 +146,7 @@ public class KNativeFunction {
                                 .setHeader("Content-Type", "application/json")
                                 .build();
                     }
-                    if (logger.isTraceEnabled()) {
-                        logger.trace("Response body is:\n {}", result.getPayload());
-                    }
+                    logger.trace("Response body is:\n {}", result.getPayload());
                     logger.debug("Response handled successfully.");
                     logger.info("Function execution complete.");
                     return result;
