@@ -1,10 +1,11 @@
 package io.polyapi.knative.function;
 
 /**
- * Please don't delete this class. This is here solely for the purpose of {@link KNativeFunction} finding a valid object when doing {@link Class#forName(String)}.
+ * This is a mock class. Do not delete nor change the package. Qualified name should be io.polyapi.knative.function.PolyCustomFunction.
  */
 public class PolyCustomFunction {
-    public void execute() {
+
+    public void execute(String param) {
         // Do nothing.
     }
 }

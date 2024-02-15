@@ -1,11 +1,16 @@
 package io.polyapi.knative.function;
 
+import io.polyapi.commons.api.error.PolyApiExecutionException;
+import io.polyapi.commons.api.error.parse.JsonToObjectParsingException;
 import io.polyapi.commons.api.json.JsonParser;
 import io.polyapi.commons.internal.json.JacksonJsonParser;
-import io.polyapi.knative.function.error.function.*;
+import io.polyapi.knative.function.error.function.creation.FunctionCreationException;
+import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
+import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
+import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
+import io.polyapi.knative.function.error.function.state.*;
 import io.polyapi.knative.function.log.PolyLogStream;
 import io.polyapi.knative.function.model.FunctionArguments;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -14,41 +19,37 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static java.lang.Boolean.FALSE;
+import static java.util.function.Predicate.not;
 import static java.util.stream.IntStream.range;
 
 @SpringBootApplication
-@Setter
 public class KNativeFunction {
     private final static Logger logger = LoggerFactory.getLogger(KNativeFunction.class);
-    private final Supplier<Object> functionSupplier;
+    private final String propertiesFile;
 
-    private JsonParser jsonParser = new JacksonJsonParser();
+    private final JsonParser jsonParser = new JacksonJsonParser();
 
     public static void main(String[] args) {
         SpringApplication.run(KNativeFunction.class, args);
     }
 
     public KNativeFunction() {
-        this(() -> {
-            try {
-                return Class.forName("io.polyapi.knative.function.PolyCustomFunction").getConstructor().newInstance();
-            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
-                throw new ConstructorNotFoundException(e);
-            } catch (InvocationTargetException | InstantiationException e) {
-                throw new FunctionCreationException(e);
-            }
-        });
+        this("/poly.properties");
     }
 
-    public KNativeFunction(Supplier<Object> functionSupplier) {
-        this.functionSupplier = functionSupplier;
+    public KNativeFunction(String propertiesFile) {
+        this.propertiesFile = propertiesFile;
     }
 
     @Bean
@@ -57,48 +58,121 @@ public class KNativeFunction {
     }
 
     private Message<?> process(Message<String> inputMessage) {
-        boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
-                .map(Object::toString)
-                .map(Boolean::getBoolean)
-                .orElse(FALSE);
-        System.setOut(new PolyLogStream(System.out, "INFO", loggingEnabled));
-        System.setErr(new PolyLogStream(System.err, "ERROR", loggingEnabled));
-        logger.debug("Executing function with payload {}.", inputMessage.getPayload());
-        FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
-        Object function = functionSupplier.get();
-        Message<?> result = Arrays.stream(function.getClass().getDeclaredMethods())
-                .filter(method -> method.getName().equals("execute"))
-                .findFirst()
-                .map(executeMethod -> {
-                    try {
-                        logger.debug("Executing method '{}'", executeMethod);
-                        return Optional.ofNullable(executeMethod.invoke(function,
-                                        range(0, arguments.size()).boxed()
-                                                .map(i -> jsonParser.parseString(arguments.get(i).toString(), executeMethod.getParameters()[i].getParameterizedType()))
-                                                .toArray()))
-                                .orElse("");
-                    } catch (InvocationTargetException e) {
-                        throw new FunctionInvocationException(e);
-                    } catch (IllegalAccessException e) {
-                        throw new ExecuteMethodNotFoundException(executeMethod, e);
-                    } catch (ArrayIndexOutOfBoundsException | IllegalArgumentException e) {
-                        throw new WrongArgumentsException(executeMethod, arguments, e);
+        try {
+            boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
+                    .map(Object::toString)
+                    .map(Boolean::getBoolean)
+                    .orElse(FALSE);
+            System.setOut(new PolyLogStream(System.out, "INFO", loggingEnabled));
+            System.setErr(new PolyLogStream(System.err, "ERROR", loggingEnabled));
+            Properties properties = new Properties();
+            logger.info("Obtaining configuration from {} file.", propertiesFile);
+            Optional.ofNullable(propertiesFile).ifPresent(file -> {
+                try (InputStream inputStream = KNativeFunction.class.getResourceAsStream(file)) {
+                    if (inputStream != null) {
+                        properties.load(inputStream);
                     }
-                })
-                .map(methodResult -> {
+                } catch (IllegalArgumentException | IOException e) {
+                    throw new InvalidConfigurationPropertiesFileException(this.propertiesFile, e);
+                }
+            });
+            logger.debug("Configuration retrieved successfully.");
+            String functionQualifiedName = properties.getProperty("polyapi.function.class", "io.polyapi.knative.function.PolyCustomFunction");
+            logger.info("Loading class {}.", functionQualifiedName);
+            Class<?> functionClass = Class.forName(functionQualifiedName);
+            logger.debug("Class {} loaded successfully.", functionQualifiedName);
+            String methodName = properties.getProperty("polyapi.function.method", "execute");
+            try {
+                String parameterTypes = properties.getProperty("polyapi.function.params");
+                Method functionMethod;
+                Class<?>[] paramTypes;
+                if (parameterTypes == null) {
+                    functionMethod = Arrays.stream(functionClass.getDeclaredMethods()).filter(method -> method.getName().equals(methodName)).findFirst().orElseThrow(() -> new ExecutionMethodNotFoundException(methodName));
+                    paramTypes = functionMethod.getParameterTypes();
+                } else {
+                    try {
+                        logger.info("Loading parameter types: [{}].", parameterTypes);
+                        paramTypes = Optional.of(parameterTypes)
+                                .filter(not(String::isBlank))
+                                .map(params -> params.split(","))
+                                .stream()
+                                .flatMap(Arrays::stream)
+                                .map(String::trim)
+                                .map(qualifiedName -> {
+                                    try {
+                                        logger.debug("Loading class for parameter type '{}'.", qualifiedName);
+                                        Class<?> result = Class.forName(qualifiedName);
+                                        logger.debug("Class loaded successfully.");
+                                        return result;
+                                    } catch (ClassNotFoundException e) {
+                                        throw new InvalidArgumentTypeException(qualifiedName, e);
+                                    }
+                                })
+                                .toArray(Class<?>[]::new);
+                        logger.debug("Parameter types loaded successfully.");
+                        logger.info("Retrieving method {}.{}({}).", functionQualifiedName, methodName, parameterTypes);
+                        functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
+                    } catch (NoSuchMethodException e) {
+                        throw new ExecutionMethodNotFoundException(methodName, parameterTypes, e);
+                    }
+
+                }
+                logger.debug("Method {} retrieved successfully.", functionMethod);
+                logger.debug("Executing function with payload {}.", inputMessage.getPayload());
+                logger.info("Retrieving default constructor to setup the server function.");
+                Constructor<?> constructor = functionClass.getDeclaredConstructor();
+                logger.debug("Default constructor retrieved successfully.");
+                logger.info("Instantiating function class {} using default constructor.", functionQualifiedName);
+                Object function = constructor.newInstance();
+                logger.info("Class {} instantiated successfully.", functionQualifiedName);
+                try {
+                    logger.debug("Parsing payload.");
+                    FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
+                    logger.debug("Parse successful.");
+                    logger.info("Executing function.");
+                    Object methodResult = Optional.ofNullable(functionMethod.invoke(function, range(0, arguments.size()).boxed()
+                                    .map(i -> jsonParser.parseString(arguments.get(i).toString(), paramTypes[i]))
+                                    .toArray()))
+                            .orElse("");
+                    logger.info("Function executed successfully.");
+                    logger.info("Handling response.");
+                    Message<?> result;
                     if (methodResult instanceof Number || methodResult instanceof String) {
-                        return MessageBuilder.withPayload(methodResult).build();
+                        logger.debug("Result is a number or a string. Skipping conversion to JSon.");
+                        result = MessageBuilder.withPayload(methodResult).build();
                     } else {
-                        return MessageBuilder.withPayload(jsonParser.toJsonString(methodResult))
+                        logger.debug("Result is not a number nor a string. Converting to Json.");
+                        result = MessageBuilder.withPayload(jsonParser.toJsonString(methodResult))
                                 .setHeader("Content-Type", "application/json")
                                 .build();
                     }
-                })
-                .orElseThrow(ExecuteMethodNotFoundException::new);
-        logger.debug("Execution successful.");
-        if (logger.isTraceEnabled()) {
-            logger.trace("Response body is:\n {}", jsonParser.toJsonString(result));
+                    logger.trace("Response body is:\n {}", result.getPayload());
+                    logger.debug("Response handled successfully.");
+                    logger.info("Function execution complete.");
+                    return result;
+                } catch (JsonToObjectParsingException | ArrayIndexOutOfBoundsException |
+                         IllegalArgumentException e) {
+                    throw new WrongArgumentsException(functionMethod, e);
+                } catch (IllegalAccessException e) {
+                    throw new ExecutionMethodNotAccessibleException(functionMethod, e);
+                } catch (InvocationTargetException e) {
+                    if (e.getTargetException() instanceof PolyApiExecutionException expectedException) {
+                        throw new PolyApiExecutionExceptionWrapperException(expectedException);
+                    } else {
+                        throw new UnexpectedFunctionExecutionException(e.getTargetException());
+                    }
+                }
+            } catch (NoSuchMethodException e) {
+                throw new ConstructorNotFoundException(e);
+            } catch (InvocationTargetException e) {
+                throw new FunctionCreationException(e);
+            } catch (InstantiationException e) {
+                throw new ClassNotInstantiableException(functionQualifiedName, e);
+            } catch (IllegalAccessException e) {
+                throw new ConstructorNotAccessibleException(e);
+            }
+        } catch (ClassNotFoundException e) {
+            throw new PolyFunctionNotFoundException(e);
         }
-        return result;
     }
 }

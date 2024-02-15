@@ -1,10 +1,10 @@
 package io.polyapi.knative.function.mock;
 
-public class MockFixedResultFunction {
+public class ConstructorWithArgumentsFunction {
 
     private final Object result;
 
-    public MockFixedResultFunction(Object result) {
+    public ConstructorWithArgumentsFunction(Object result) {
         this.result = result;
     }
 

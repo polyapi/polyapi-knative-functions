@@ -1,15 +1,12 @@
 package io.polyapi.knative.function.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
-@Getter
 @Setter
 public class FunctionArguments {
     private List<JsonNode> args;
@@ -20,10 +17,6 @@ public class FunctionArguments {
 
     public JsonNode get(int position) {
         return list().get(position);
-    }
-
-    public Stream<Class<?>> stream() {
-        return list().stream().map(Object::getClass);
     }
 
     public int size() {
