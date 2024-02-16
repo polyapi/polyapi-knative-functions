@@ -45,7 +45,7 @@ public class KNativeFunction {
     }
 
     public KNativeFunction() {
-        this("/poly.properties");
+        this("/poly-knative.properties");
     }
 
     public KNativeFunction(String propertiesFile) {
@@ -69,7 +69,10 @@ public class KNativeFunction {
             logger.info("Obtaining configuration from {} file.", propertiesFile);
             Optional.ofNullable(propertiesFile).ifPresent(file -> {
                 try (InputStream inputStream = KNativeFunction.class.getResourceAsStream(file)) {
-                    if (inputStream != null) {
+                    if (inputStream == null) {
+                        logger.warn("Properties file not found. Using default values.");
+                    } else {
+                        logger.info("Properties file '{}' found. Extracting properties from it.", file);
                         properties.load(inputStream);
                     }
                 } catch (IllegalArgumentException | IOException e) {
