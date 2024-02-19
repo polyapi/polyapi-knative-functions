@@ -45,7 +45,7 @@ public class KNativeFunction {
     @Value("${polyapi.function.method:execute}")
     private String methodName;
 
-    @Value("${polyapi.function.params}")
+    @Value("${polyapi.function.params:#{null}}")
     private String parameterTypes;
 
     public static void main(String[] args) {
