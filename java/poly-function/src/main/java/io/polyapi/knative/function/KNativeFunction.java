@@ -116,7 +116,7 @@ public class KNativeFunction {
                     logger.debug("Parse successful.");
                     logger.info("Executing function.");
                     Object methodResult = Optional.ofNullable(functionMethod.invoke(function, range(0, arguments.size()).boxed()
-                                    .map(i -> jsonParser.parseString(arguments.get(i).toString(), paramTypes[i]))
+                                    .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
                                     .toArray()))
                             .orElse("");
                     logger.info("Function executed successfully.");
