@@ -65,7 +65,7 @@ public class KNativeFunction {
         try {
             boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
                     .map(Object::toString)
-                    .map(Boolean::getBoolean)
+                    .map(Boolean::parseBoolean)
                     .orElse(FALSE);
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
