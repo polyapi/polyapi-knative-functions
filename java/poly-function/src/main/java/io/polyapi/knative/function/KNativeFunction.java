@@ -10,6 +10,7 @@ import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExce
 import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
 import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
 import io.polyapi.knative.function.error.function.state.*;
+import io.polyapi.knative.function.log.PolyAppender;
 import io.polyapi.knative.function.model.FunctionArguments;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +64,7 @@ public class KNativeFunction {
 
     private Message<?> process(Message<String> inputMessage) {
         try {
+            Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
             boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
                     .map(Object::toString)
                     .map(Boolean::parseBoolean)
