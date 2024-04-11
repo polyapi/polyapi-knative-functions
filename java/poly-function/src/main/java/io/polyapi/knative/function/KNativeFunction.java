@@ -118,6 +118,7 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
+                    log.info("PAYLOAD: {}", inputMessage.getPayload());
                     FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
                     log.debug("Parse successful.");
                     log.info("Executing function.");
@@ -128,8 +129,7 @@ public class KNativeFunction {
                                             .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
                                             .toArray()))
                                     .orElse(""));
-                        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException |
-                                 JsonToObjectParsingException e) {
+                        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException | JsonToObjectParsingException e) {
                             completableFuture.completeExceptionally(new WrongArgumentsException(functionMethod, e));
                         } catch (IllegalAccessException e) {
                             completableFuture.completeExceptionally(new ExecutionMethodNotAccessibleException(functionMethod, e));
