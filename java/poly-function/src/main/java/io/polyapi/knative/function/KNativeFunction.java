@@ -9,8 +9,13 @@ import io.polyapi.knative.function.error.function.creation.FunctionCreationExcep
 import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
 import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
 import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
-import io.polyapi.knative.function.error.function.state.*;
-import io.polyapi.knative.function.log.PolyAppender;
+import io.polyapi.knative.function.error.function.state.ClassNotInstantiableException;
+import io.polyapi.knative.function.error.function.state.ConstructorNotAccessibleException;
+import io.polyapi.knative.function.error.function.state.ConstructorNotFoundException;
+import io.polyapi.knative.function.error.function.state.ExecutionMethodNotAccessibleException;
+import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundException;
+import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
+import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
 import io.polyapi.knative.function.model.FunctionArguments;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -64,11 +69,9 @@ public class KNativeFunction {
 
     private Message<?> process(Message<String> inputMessage) {
         try {
-            Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
-            boolean loggingEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
-                    .map(Object::toString)
-                    .map(Boolean::parseBoolean)
-                    .orElse(FALSE);
+            if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
+                Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
+            }
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
@@ -125,7 +128,8 @@ public class KNativeFunction {
                                             .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
                                             .toArray()))
                                     .orElse(""));
-                        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException | JsonToObjectParsingException e) {
+                        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException |
+                                 JsonToObjectParsingException e) {
                             completableFuture.completeExceptionally(new WrongArgumentsException(functionMethod, e));
                         } catch (IllegalAccessException e) {
                             completableFuture.completeExceptionally(new ExecutionMethodNotAccessibleException(functionMethod, e));
@@ -139,7 +143,10 @@ public class KNativeFunction {
                             completableFuture.completeExceptionally(e);
                         }
                     },
-                            format("%sThread-%s", loggingEnabled ? LOGGING_THREAD_PREFIX : "", UUID.randomUUID()))
+                            format("%sThread-%s", Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
+                                    .map(Object::toString)
+                                    .map(Boolean::parseBoolean)
+                                    .orElse(FALSE) ? LOGGING_THREAD_PREFIX : "", UUID.randomUUID()))
                             .start(); // Thread name defined by adding logs or not. This way the PolyAppender can know if it should log this or not.
                     Object methodResult = completableFuture.get();
                     log.info("Function executed successfully.");
