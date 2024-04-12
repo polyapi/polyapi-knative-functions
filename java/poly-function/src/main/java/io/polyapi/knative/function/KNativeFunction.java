@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static io.polyapi.knative.function.log.PolyAppender.LOGGING_THREAD_PREFIX;
 import static java.lang.Boolean.FALSE;
@@ -118,7 +119,8 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
-                    inputMessage.getHeaders().forEach((key, value) -> log.info("KEY: {} - VALUE: {}", key, value));
+                    log.info("HEADERS:\n{}", inputMessage.getHeaders().entrySet().stream().map(entry -> format("\"%s\": \"%s\"", entry.getKey(), entry.getValue())).collect(Collectors.joining(", ", "{", "}")));
+                    log.info("PAYLOAD:\n{}", inputMessage.getPayload());
                     FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
                     log.debug("Parse successful.");
                     log.info("Executing function.");
