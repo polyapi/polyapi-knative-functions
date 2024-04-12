@@ -118,6 +118,7 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
+                    inputMessage.getHeaders().forEach((key, value) -> log.info("KEY: {} - VALUE: {}", key, value));
                     FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
                     log.debug("Parse successful.");
                     log.info("Executing function.");
