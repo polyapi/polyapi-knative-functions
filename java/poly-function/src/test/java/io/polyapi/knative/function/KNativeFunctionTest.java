@@ -68,7 +68,7 @@ public class KNativeFunctionTest {
         processTest(description, className, methodName, parameterTypes, payload, expectedPayload, expectedHeaders);
     }
 
-    public void processTest(String description, String className, String methodName, String parameterTypes, String payload, Object expectedPayload, Map<String, Object> expectedHeaders) {
+    public void processTest(String description, String className, String methodName, String parameterTypes, Object payload, Object expectedPayload, Map<String, Object> expectedHeaders) {
         String caseTitle = format("- %s -", description);
         String titleSeparator = range(0, caseTitle.length()).boxed().map(i -> "-").collect(joining());
         logger.info("\n{}", titleSeparator);
