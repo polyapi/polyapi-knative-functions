@@ -63,11 +63,11 @@ public class KNativeFunction {
     }
 
     @Bean
-    public Function<Message<String>, Message<?>> execute() {
+    public Function<Message<Object>, Message<?>> execute() {
         return this::process;
     }
 
-    private Message<?> process(Message<String> inputMessage) {
+    private Message<?> process(Message<Object> inputMessage) {
         try {
             if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
                 Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
@@ -75,6 +75,7 @@ public class KNativeFunction {
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
+            String payload = Optional.of(inputMessage.getPayload()).map(Object::toString).orElseThrow();
             try {
                 Method functionMethod;
                 Class<?>[] paramTypes;
@@ -109,7 +110,7 @@ public class KNativeFunction {
 
                 }
                 log.debug("Method {} retrieved successfully.", functionMethod);
-                log.debug("Executing function with payload {}.", inputMessage.getPayload());
+                log.debug("Executing function with payload {}.", payload);
                 log.info("Retrieving default constructor to setup the server function.");
                 Constructor<?> constructor = functionClass.getDeclaredConstructor();
                 log.debug("Default constructor retrieved successfully.");
@@ -118,7 +119,7 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
-                    FunctionArguments arguments = jsonParser.parseString(inputMessage.getPayload(), FunctionArguments.class);
+                    FunctionArguments arguments = jsonParser.parseString(payload, FunctionArguments.class);
                     log.debug("Parse successful.");
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
