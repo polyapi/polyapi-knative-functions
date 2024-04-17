@@ -4,7 +4,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.ConsoleAppender;
 
 public class PolyAppender extends ConsoleAppender<ILoggingEvent> {
-    public static final String LOGGING_THREAD_PREFIX = "Log";
+    public static final String LOGGING_THREAD_PREFIX = "Poly-log-";
 
     @Override
     protected void append(ILoggingEvent eventObject) {

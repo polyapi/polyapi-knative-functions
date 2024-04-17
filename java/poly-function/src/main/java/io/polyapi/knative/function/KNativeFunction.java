@@ -74,9 +74,19 @@ public class KNativeFunction {
 
     private Message<?> process(Message<Object> inputMessage) {
         try {
+            boolean logEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
+                    .map(Object::toString)
+                    .map(Boolean::parseBoolean)
+                    .orElse(FALSE);
             log.info("Executing function '{}'.", functionId);
-            if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
-                Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
+            if (logEnabled) {
+                if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
+                    Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
+                }
+            } else {
+                if (Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
+                    Thread.currentThread().setName(Optional.of(Thread.currentThread().getName().substring(LOGGING_THREAD_PREFIX.length())).filter(not(String::isBlank)).orElse("Main"));
+                }
             }
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
@@ -112,7 +122,6 @@ public class KNativeFunction {
                     } catch (NoSuchMethodException e) {
                         throw new ExecutionMethodNotFoundException(methodName, parameterTypes, e);
                     }
-
                 }
                 log.debug("Method {} retrieved successfully.", functionMethod);
                 log.info("Retrieving default constructor to setup the server function.");
@@ -122,8 +131,10 @@ public class KNativeFunction {
                 Object function = constructor.newInstance();
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
-                    InvocationStrategy invocationStrategy = inputMessage.getHeaders().containsKey("ce-id")? new TriggerInvocationStrategy(jsonParser, functionId) : new DefaultInvocationStrategy(jsonParser);
+                    InvocationStrategy invocationStrategy = inputMessage.getHeaders().containsKey("ce-id") ? new TriggerInvocationStrategy(jsonParser, functionId) : new DefaultInvocationStrategy(jsonParser);
                     log.info("Invocation strategy: {}", invocationStrategy.getName());
+                    log.info("Headers");
+                    inputMessage.getHeaders().forEach((key, value) -> log.info("    \"{}\": \"{}\"", key, value));
                     FunctionArguments arguments = invocationStrategy.parsePayload(inputMessage.getPayload());
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
@@ -148,16 +159,15 @@ public class KNativeFunction {
                             completableFuture.completeExceptionally(e);
                         }
                     },
-                            format("%sThread-%s", Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
-                                    .map(Object::toString)
-                                    .map(Boolean::parseBoolean)
-                                    .orElse(FALSE) ? LOGGING_THREAD_PREFIX : "", UUID.randomUUID()))
+                            format("%sThread-%s", logEnabled ? LOGGING_THREAD_PREFIX : "", UUID.randomUUID()))
                             .start(); // Thread name defined by adding logs or not. This way the PolyAppender can know if it should log this or not.
                     Object methodResult = completableFuture.get();
                     log.info("Function executed successfully.");
                     log.info("Handling response.");
                     Message<?> result = invocationStrategy.parseResult(methodResult, inputMessage.getHeaders());
                     log.info("Response body is:\n {}", result.getPayload());
+                    log.info("Response headers are:\n");
+                    result.getHeaders().forEach((key, value) -> log.info("    \"{}\": \"{}\"", key, value));
                     log.debug("Response handled successfully.");
                     log.info("Function '{}' execution complete.", functionId);
                     return result;
