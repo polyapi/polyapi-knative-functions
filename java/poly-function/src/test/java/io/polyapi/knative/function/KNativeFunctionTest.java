@@ -7,8 +7,28 @@ import io.polyapi.knative.function.error.function.creation.FunctionCreationExcep
 import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
 import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
 import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
-import io.polyapi.knative.function.error.function.state.*;
-import io.polyapi.knative.function.mock.*;
+import io.polyapi.knative.function.error.function.state.ClassNotInstantiableException;
+import io.polyapi.knative.function.error.function.state.ConstructorNotAccessibleException;
+import io.polyapi.knative.function.error.function.state.ConstructorNotFoundException;
+import io.polyapi.knative.function.error.function.state.ExecutionMethodNotAccessibleException;
+import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundException;
+import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
+import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
+import io.polyapi.knative.function.mock.AbstractFunction;
+import io.polyapi.knative.function.mock.ConstructorWithArgumentsFunction;
+import io.polyapi.knative.function.mock.ExceptionThrowingConstructorFunction;
+import io.polyapi.knative.function.mock.MapReturningMockFunction;
+import io.polyapi.knative.function.mock.MockCustomExecutionMethodFunction;
+import io.polyapi.knative.function.mock.MockExpectedExceptionThrowingFunction;
+import io.polyapi.knative.function.mock.MockInnerClassParameterFunction;
+import io.polyapi.knative.function.mock.MockNumberReturningPolyCustomFunction;
+import io.polyapi.knative.function.mock.MockPolyCustomFunction;
+import io.polyapi.knative.function.mock.MockPrivateExecutionMethodFunction;
+import io.polyapi.knative.function.mock.MockRuntimeExceptionThrowingFunction;
+import io.polyapi.knative.function.mock.MockSingleParameterProcess;
+import io.polyapi.knative.function.mock.MultipleParametersFunction;
+import io.polyapi.knative.function.mock.PrivateConstructorFunction;
+import io.polyapi.knative.function.mock.TriggerEventFunction;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -24,7 +44,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.TRUE;
@@ -43,7 +62,7 @@ public class KNativeFunctionTest {
     private static final Logger logger = LoggerFactory.getLogger(KNativeFunctionTest.class);
     private static final String DEFAULT_SUCCESSFUL_RESULT = "";
     private static final Map<String, Object> DEFAULT_CONTENT_TYPE_HEADERS = Map.of("Content-Type", "application/json");
-    private static final Map<String, String> TRIGGER_HEADERS = Map.of("ce-id", "true");
+    private static final Map<String, String> TRIGGER_HEADERS = Map.of("ce-id", "true", "x-poly-execution-id", "1234", "ce-environment", "asdfg");
     private static final JsonParser jsonParser = new JacksonJsonParser();
 
     @Autowired
@@ -58,44 +77,43 @@ public class KNativeFunctionTest {
     }
 
     public static Stream<Arguments> processTestSource() {
-        return Stream.of(Arguments.of("CASE 1: Default reflection generation of custom function.", null, null, null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 2: Properties file without method name property. Defaults to execute.", PolyCustomFunction.class.getName(), null, String.class.getName(), createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 3: Properties file without parameter property. Should find any match by name.", PolyCustomFunction.class.getName(), "execute", null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 4: Empty JSon message & no headers.", MockPolyCustomFunction.class.getName(), "execute", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 5: Number value to String parameter.", MockSingleParameterProcess.class.getName(), "execute", Integer.class.getName(), createBody(1), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 6: Inner class parameter.", MockInnerClassParameterFunction.class.getName(), "execute", MockInnerClassParameterFunction.InnerClass.class.getName(), createBody(Map.of("name", "test")), null, "test", Map.of()),
-                Arguments.of("CASE 7: Execution method with different name.", MockCustomExecutionMethodFunction.class.getName(), "differentMethod", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 8: Execution method with Map return type.", MapReturningMockFunction.class.getName(), "execute", "", createBody(), null, "{\"key\":\"value\"}", DEFAULT_CONTENT_TYPE_HEADERS),
-                Arguments.of("CASE 9: Number returning function.", MockNumberReturningPolyCustomFunction.class.getName(), "execute", "", createBody(), null, 1, Map.of()),
-                Arguments.of("CASE 10: Multiple params function.", MultipleParametersFunction.class.getName(), "execute", createParamTypes(String.class, Integer.class), createBody("Test",1), null, "Test1", Map.of()),
-                Arguments.of("CASE 11: Trigger execution.", TriggerEventFunction.class.getName(), "execute", createParamTypes(String.class, Map.class, Map.class), jsonParser.toJsonString(List.of("test", TRIGGER_HEADERS, Map.of())), TRIGGER_HEADERS, "test", Map.of()));
+        return Stream.of(Arguments.of("CASE 1: Default reflection generation of custom function.", null, null, null, null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 2: Properties file without method name property. Defaults to execute.", null, PolyCustomFunction.class.getName(), null, String.class.getName(), createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 3: Properties file without parameter property. Should find any match by name.", null, PolyCustomFunction.class.getName(), "execute", null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 4: Empty JSon message & no headers.", null, MockPolyCustomFunction.class.getName(), "execute", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 5: Number value to String parameter.", null, MockSingleParameterProcess.class.getName(), "execute", Integer.class.getName(), createBody(1), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 6: Inner class parameter.", null, MockInnerClassParameterFunction.class.getName(), "execute", MockInnerClassParameterFunction.InnerClass.class.getName(), createBody(Map.of("name", "test")), null, "test", Map.of()),
+                Arguments.of("CASE 7: Execution method with different name.", null, MockCustomExecutionMethodFunction.class.getName(), "differentMethod", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 8: Execution method with Map return type.", null, MapReturningMockFunction.class.getName(), "execute", "", createBody(), null, "{\"key\":\"value\"}", DEFAULT_CONTENT_TYPE_HEADERS),
+                Arguments.of("CASE 9: Number returning function.", null, MockNumberReturningPolyCustomFunction.class.getName(), "execute", "", createBody(), null, 1, Map.of()),
+                Arguments.of("CASE 10: Multiple params function.", null, MultipleParametersFunction.class.getName(), "execute", createParamTypes(String.class, Integer.class), createBody("Test",1), null, "Test1", Map.of()),
+                Arguments.of("CASE 11: Trigger execution.", "12345678", TriggerEventFunction.class.getName(), "execute", createParamTypes(String.class, Map.class, Map.class), jsonParser.toJsonString(List.of("test", TRIGGER_HEADERS, Map.of())), TRIGGER_HEADERS, "{\"data\":\"test\",\"statusCode\":200,\"executionId\":\"1234\",\"functionId\":\"12345678\",\"environmentId\":\"asdfg\",\"contentType\":\"application/json\",\"metrics\":{\"start\":1234,\"end\":1235}}", TRIGGER_HEADERS));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("processTestSource")
-    public void processSuccessfulTest(String description, String className, String methodName, String parameterTypes, String payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
-        processTest(description, className, methodName, parameterTypes, payload, headers, expectedPayload, expectedHeaders);
+    public void processSuccessfulTest(String description, String functionId, String className, String methodName, String parameterTypes, String payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
+        processTest(description, functionId, className, methodName, parameterTypes, payload, headers, expectedPayload, expectedHeaders);
     }
 
-    public void processTest(String description, String className, String methodName, String parameterTypes, Object payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
+    public void processTest(String description, String functionId, String className, String methodName, String parameterTypes, Object payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
         String caseTitle = format("- %s -", description);
         String titleSeparator = range(0, caseTitle.length()).boxed().map(i -> "-").collect(joining());
         logger.info("\n{}", titleSeparator);
         logger.info(caseTitle);
         logger.info("{}\n", titleSeparator);
+        Optional.ofNullable(functionId).ifPresent(kNativeFunction::setFunctionId);
         Optional.ofNullable(className).ifPresent(kNativeFunction::setFunctionQualifiedName);
         Optional.ofNullable(methodName).ifPresent(kNativeFunction::setMethodName);
         kNativeFunction.setParameterTypes(parameterTypes);
         Message<?> result = kNativeFunction.execute().apply(MessageBuilder.withPayload(payload).copyHeaders(Optional.ofNullable(headers).orElseGet(HashMap::new)).build());
         assertThat(result, notNullValue());
-        assertThat(result.getPayload(), equalTo(expectedPayload));
+        assertThat(Optional.ofNullable(result.getPayload()).filter(String.class::isInstance).map(Object::toString).<Object>map(resultPayload -> resultPayload.replaceAll("\\\"start\\\":\\d*,\\\"end\\\":\\d*", "\"start\":1234,\"end\":1235")).orElse(result.getPayload()), equalTo(expectedPayload));
         Map<String, Object> returnedHeaders = new HashMap<>(result.getHeaders());
         assertThat(returnedHeaders.remove("id"), notNullValue());
         assertThat(returnedHeaders.remove("timestamp"), notNullValue());
         assertThat(returnedHeaders.size(), equalTo(expectedHeaders.size()));
-        returnedHeaders.forEach((key, value) -> {
-            assertThat(value, equalTo(expectedHeaders.get(key)));
-        });
+        returnedHeaders.forEach((key, value) -> assertThat(value, equalTo(expectedHeaders.get(key))));
     }
 
     public static Stream<Arguments> processErrorTestSource() {
@@ -120,7 +138,7 @@ public class KNativeFunctionTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("processErrorTestSource")
     public void processErrorTest(String description, String className, String methodName, String parameterTypes, String payload, Class<? extends PolyKNativeFunctionException> expectedException, Integer expectedStatusCode, String expectedExceptionMessage) {
-        PolyKNativeFunctionException exception = assertThrows(expectedException, () -> processTest(description, className, methodName, parameterTypes, payload, null, "", DEFAULT_CONTENT_TYPE_HEADERS));
+        PolyKNativeFunctionException exception = assertThrows(expectedException, () -> processTest(description, null, className, methodName, parameterTypes, payload, null, "", DEFAULT_CONTENT_TYPE_HEADERS));
         assertThat(exception.getMessage(), equalTo(expectedExceptionMessage));
         assertThat(exception.getStatusCode(), equalTo(expectedStatusCode));
     }
