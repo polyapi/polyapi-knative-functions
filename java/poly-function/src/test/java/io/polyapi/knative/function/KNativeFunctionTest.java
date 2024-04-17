@@ -19,7 +19,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -41,6 +43,7 @@ public class KNativeFunctionTest {
     private static final Logger logger = LoggerFactory.getLogger(KNativeFunctionTest.class);
     private static final String DEFAULT_SUCCESSFUL_RESULT = "";
     private static final Map<String, Object> DEFAULT_CONTENT_TYPE_HEADERS = Map.of("Content-Type", "application/json");
+    private static final Map<String, String> TRIGGER_HEADERS = Map.of("ce-id", "true");
     private static final JsonParser jsonParser = new JacksonJsonParser();
 
     @Autowired
@@ -50,25 +53,31 @@ public class KNativeFunctionTest {
         return jsonParser.toJsonString(Map.of("args", stream(args).toList()));
     }
 
+    private static String createParamTypes(Class... classes) {
+        return Arrays.stream(classes).map(Class::getName).collect(joining(","));
+    }
+
     public static Stream<Arguments> processTestSource() {
-        return Stream.of(Arguments.of("CASE 1: Default reflection generation of custom function.", null, null, null, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 2: Properties file without method name property. Defaults to execute.", PolyCustomFunction.class.getName(), null, String.class.getName(), createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 3: Properties file without parameter property. Should find any match by name.", PolyCustomFunction.class.getName(), "execute", null, createBody("Test"), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 4: Empty JSon message & no headers.", MockPolyCustomFunction.class.getName(), "execute", "", createBody(), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 5: Number value to String parameter.", MockSingleParameterProcess.class.getName(), "execute", Integer.class.getName(), createBody(1), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 6: Inner class parameter.", MockInnerClassParameterFunction.class.getName(), "execute", MockInnerClassParameterFunction.InnerClass.class.getName(), createBody(Map.of("name", "test")), "test", Map.of()),
-                Arguments.of("CASE 7: Execution method with different name.", MockCustomExecutionMethodFunction.class.getName(), "differentMethod", "", createBody(), DEFAULT_SUCCESSFUL_RESULT, Map.of()),
-                Arguments.of("CASE 8: Execution method with Map return type.", MapReturningMockFunction.class.getName(), "execute", "", createBody(), "{\"key\":\"value\"}", DEFAULT_CONTENT_TYPE_HEADERS),
-                Arguments.of("CASE 9: Number returning function.", MockNumberReturningPolyCustomFunction.class.getName(), "execute", "", createBody(), 1, Map.of()));
+        return Stream.of(Arguments.of("CASE 1: Default reflection generation of custom function.", null, null, null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 2: Properties file without method name property. Defaults to execute.", PolyCustomFunction.class.getName(), null, String.class.getName(), createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 3: Properties file without parameter property. Should find any match by name.", PolyCustomFunction.class.getName(), "execute", null, createBody("Test"), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 4: Empty JSon message & no headers.", MockPolyCustomFunction.class.getName(), "execute", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 5: Number value to String parameter.", MockSingleParameterProcess.class.getName(), "execute", Integer.class.getName(), createBody(1), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 6: Inner class parameter.", MockInnerClassParameterFunction.class.getName(), "execute", MockInnerClassParameterFunction.InnerClass.class.getName(), createBody(Map.of("name", "test")), null, "test", Map.of()),
+                Arguments.of("CASE 7: Execution method with different name.", MockCustomExecutionMethodFunction.class.getName(), "differentMethod", "", createBody(), null, DEFAULT_SUCCESSFUL_RESULT, Map.of()),
+                Arguments.of("CASE 8: Execution method with Map return type.", MapReturningMockFunction.class.getName(), "execute", "", createBody(), null, "{\"key\":\"value\"}", DEFAULT_CONTENT_TYPE_HEADERS),
+                Arguments.of("CASE 9: Number returning function.", MockNumberReturningPolyCustomFunction.class.getName(), "execute", "", createBody(), null, 1, Map.of()),
+                Arguments.of("CASE 10: Multiple params function.", MultipleParametersFunction.class.getName(), "execute", createParamTypes(String.class, Integer.class), createBody("Test",1), null, "Test1", Map.of()),
+                Arguments.of("CASE 11: Trigger execution.", TriggerEventFunction.class.getName(), "execute", createParamTypes(String.class, Map.class, Map.class), jsonParser.toJsonString(List.of("test", TRIGGER_HEADERS, Map.of())), TRIGGER_HEADERS, "test", Map.of()));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("processTestSource")
-    public void processSuccessfulTest(String description, String className, String methodName, String parameterTypes, String payload, Object expectedPayload, Map<String, Object> expectedHeaders) {
-        processTest(description, className, methodName, parameterTypes, payload, expectedPayload, expectedHeaders);
+    public void processSuccessfulTest(String description, String className, String methodName, String parameterTypes, String payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
+        processTest(description, className, methodName, parameterTypes, payload, headers, expectedPayload, expectedHeaders);
     }
 
-    public void processTest(String description, String className, String methodName, String parameterTypes, Object payload, Object expectedPayload, Map<String, Object> expectedHeaders) {
+    public void processTest(String description, String className, String methodName, String parameterTypes, Object payload, Map<String, String> headers, Object expectedPayload, Map<String, Object> expectedHeaders) {
         String caseTitle = format("- %s -", description);
         String titleSeparator = range(0, caseTitle.length()).boxed().map(i -> "-").collect(joining());
         logger.info("\n{}", titleSeparator);
@@ -77,7 +86,7 @@ public class KNativeFunctionTest {
         Optional.ofNullable(className).ifPresent(kNativeFunction::setFunctionQualifiedName);
         Optional.ofNullable(methodName).ifPresent(kNativeFunction::setMethodName);
         kNativeFunction.setParameterTypes(parameterTypes);
-        Message<?> result = kNativeFunction.execute().apply(MessageBuilder.withPayload(payload).build());
+        Message<?> result = kNativeFunction.execute().apply(MessageBuilder.withPayload(payload).copyHeaders(Optional.ofNullable(headers).orElseGet(HashMap::new)).build());
         assertThat(result, notNullValue());
         assertThat(result.getPayload(), equalTo(expectedPayload));
         Map<String, Object> returnedHeaders = new HashMap<>(result.getHeaders());
@@ -111,7 +120,7 @@ public class KNativeFunctionTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("processErrorTestSource")
     public void processErrorTest(String description, String className, String methodName, String parameterTypes, String payload, Class<? extends PolyKNativeFunctionException> expectedException, Integer expectedStatusCode, String expectedExceptionMessage) {
-        PolyKNativeFunctionException exception = assertThrows(expectedException, () -> processTest(description, className, methodName, parameterTypes, payload, "", DEFAULT_CONTENT_TYPE_HEADERS));
+        PolyKNativeFunctionException exception = assertThrows(expectedException, () -> processTest(description, className, methodName, parameterTypes, payload, null, "", DEFAULT_CONTENT_TYPE_HEADERS));
         assertThat(exception.getMessage(), equalTo(expectedExceptionMessage));
         assertThat(exception.getStatusCode(), equalTo(expectedStatusCode));
     }
