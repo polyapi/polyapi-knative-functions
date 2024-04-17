@@ -1,14 +1,11 @@
 package io.polyapi.knative.function;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.polyapi.commons.api.error.PolyApiExecutionException;
 import io.polyapi.commons.api.error.parse.JsonToObjectParsingException;
 import io.polyapi.commons.api.json.JsonParser;
 import io.polyapi.commons.internal.json.JacksonJsonParser;
 import io.polyapi.knative.function.error.PolyKNativeFunctionException;
 import io.polyapi.knative.function.error.function.creation.FunctionCreationException;
-import io.polyapi.knative.function.error.function.execution.MissingPayloadException;
 import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
 import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
 import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
@@ -19,6 +16,9 @@ import io.polyapi.knative.function.error.function.state.ExecutionMethodNotAccess
 import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundException;
 import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
 import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
+import io.polyapi.knative.function.invocation.DefaultInvocationStrategy;
+import io.polyapi.knative.function.invocation.InvocationStrategy;
+import io.polyapi.knative.function.invocation.TriggerInvocationStrategy;
 import io.polyapi.knative.function.model.FunctionArguments;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -27,13 +27,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.support.MessageBuilder;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -52,6 +50,9 @@ import static java.util.stream.IntStream.range;
 public class KNativeFunction {
 
     private final JsonParser jsonParser = new JacksonJsonParser();
+
+    @Value("${polyapi.function.id:}")
+    private String functionId;
 
     @Value("${polyapi.function.class:io.polyapi.knative.function.PolyCustomFunction}")
     private String functionQualifiedName;
@@ -120,17 +121,8 @@ public class KNativeFunction {
                 Object function = constructor.newInstance();
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
-                    String payload = Optional.of(inputMessage.getPayload()).map(Object::toString).orElseThrow(MissingPayloadException::new);
-                    log.info("Parsing payload '{}'.", payload);
-                    FunctionArguments arguments;
-                    if (inputMessage.getHeaders().containsKey("ce-id")) {
-                        log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
-                        arguments = new FunctionArguments(jsonParser.parseString(payload, TypeFactory.defaultInstance().constructCollectionType(List.class, JsonNode.class)));
-                    } else {
-                        log.debug("Lack of 'ce-id' header indicates the function is invoked normally.");
-                        arguments = jsonParser.parseString(payload, FunctionArguments.class);
-                    }
-                    log.debug("Parse successful.");
+                    InvocationStrategy invocationStrategy = inputMessage.getHeaders().containsKey("ce-id")? new TriggerInvocationStrategy(jsonParser, functionId) : new DefaultInvocationStrategy(jsonParser);
+                    FunctionArguments arguments = invocationStrategy.parsePayload(inputMessage.getPayload());
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
                     new Thread(() -> {
@@ -162,16 +154,7 @@ public class KNativeFunction {
                     Object methodResult = completableFuture.get();
                     log.info("Function executed successfully.");
                     log.info("Handling response.");
-                    Message<?> result;
-                    if (methodResult instanceof Number || methodResult instanceof String) {
-                        log.debug("Result is a number or a string. Skipping conversion to JSon.");
-                        result = MessageBuilder.withPayload(methodResult).build();
-                    } else {
-                        log.debug("Result is not a number nor a string. Converting to Json.");
-                        result = MessageBuilder.withPayload(jsonParser.toJsonString(methodResult))
-                                .setHeader("Content-Type", "application/json")
-                                .build();
-                    }
+                    Message<?> result = invocationStrategy.parseResult(methodResult, inputMessage.getHeaders());
                     log.trace("Response body is:\n {}", result.getPayload());
                     log.debug("Response handled successfully.");
                     log.info("Function execution complete.");
