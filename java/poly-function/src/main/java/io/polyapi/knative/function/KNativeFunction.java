@@ -74,6 +74,7 @@ public class KNativeFunction {
 
     private Message<?> process(Message<Object> inputMessage) {
         try {
+            log.info("Executing function '{}'.", functionId);
             if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
                 Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
             }
@@ -122,6 +123,7 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     InvocationStrategy invocationStrategy = inputMessage.getHeaders().containsKey("ce-id")? new TriggerInvocationStrategy(jsonParser, functionId) : new DefaultInvocationStrategy(jsonParser);
+                    log.info("Invocation strategy: {}", invocationStrategy.getName());
                     FunctionArguments arguments = invocationStrategy.parsePayload(inputMessage.getPayload());
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
@@ -157,7 +159,7 @@ public class KNativeFunction {
                     Message<?> result = invocationStrategy.parseResult(methodResult, inputMessage.getHeaders());
                     log.info("Response body is:\n {}", result.getPayload());
                     log.debug("Response handled successfully.");
-                    log.info("Function execution complete.");
+                    log.info("Function '{}' execution complete.", functionId);
                     return result;
                 } catch (JsonToObjectParsingException e) {
                     throw new WrongArgumentsException(functionMethod, e);

@@ -51,4 +51,6 @@ public abstract class InvocationStrategy {
     protected String toJsonString(Object object) {
         return jsonParser.toJsonString(object);
     }
+
+    public abstract String getName();
 }
