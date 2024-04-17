@@ -155,7 +155,7 @@ public class KNativeFunction {
                     log.info("Function executed successfully.");
                     log.info("Handling response.");
                     Message<?> result = invocationStrategy.parseResult(methodResult, inputMessage.getHeaders());
-                    log.trace("Response body is:\n {}", result.getPayload());
+                    log.info("Response body is:\n {}", result.getPayload());
                     log.debug("Response handled successfully.");
                     log.info("Function execution complete.");
                     return result;
