@@ -1,6 +1,5 @@
 package io.polyapi.knative.function;
 
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.polyapi.commons.api.error.PolyApiExecutionException;
@@ -9,6 +8,7 @@ import io.polyapi.commons.api.json.JsonParser;
 import io.polyapi.commons.internal.json.JacksonJsonParser;
 import io.polyapi.knative.function.error.PolyKNativeFunctionException;
 import io.polyapi.knative.function.error.function.creation.FunctionCreationException;
+import io.polyapi.knative.function.error.function.execution.MissingPayloadException;
 import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
 import io.polyapi.knative.function.error.function.execution.UnexpectedFunctionExecutionException;
 import io.polyapi.knative.function.error.function.execution.WrongArgumentsException;
@@ -79,7 +79,6 @@ public class KNativeFunction {
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
-            String payload = Optional.of(inputMessage.getPayload()).map(Object::toString).orElseThrow();
             try {
                 Method functionMethod;
                 Class<?>[] paramTypes;
@@ -114,7 +113,6 @@ public class KNativeFunction {
 
                 }
                 log.debug("Method {} retrieved successfully.", functionMethod);
-                log.info("Executing function with payload {}.", payload);
                 log.info("Retrieving default constructor to setup the server function.");
                 Constructor<?> constructor = functionClass.getDeclaredConstructor();
                 log.debug("Default constructor retrieved successfully.");
@@ -122,7 +120,8 @@ public class KNativeFunction {
                 Object function = constructor.newInstance();
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
-                    log.debug("Parsing payload.");
+                    String payload = Optional.of(inputMessage.getPayload()).map(Object::toString).orElseThrow(MissingPayloadException::new);
+                    log.info("Parsing payload '{}'.", payload);
                     FunctionArguments arguments;
                     if (inputMessage.getHeaders().containsKey("ce-id")) {
                         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
