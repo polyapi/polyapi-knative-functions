@@ -123,7 +123,14 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
-                    FunctionArguments arguments = inputMessage.getHeaders().containsKey("ce-id")? jsonParser.parseString(payload, TypeFactory.defaultInstance().constructCollectionType(List.class, JsonNode.class)) : jsonParser.parseString(payload, FunctionArguments.class);
+                    FunctionArguments arguments;
+                    if (inputMessage.getHeaders().containsKey("ce-id")) {
+                        log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
+                        arguments = new FunctionArguments(jsonParser.parseString(payload, TypeFactory.defaultInstance().constructCollectionType(List.class, JsonNode.class)));
+                    } else {
+                        log.debug("Lack of 'ce-id' header indicates the function is invoked normally.");
+                        arguments = jsonParser.parseString(payload, FunctionArguments.class);
+                    }
                     log.debug("Parse successful.");
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
