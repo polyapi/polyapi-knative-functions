@@ -110,7 +110,7 @@ public class KNativeFunction {
 
                 }
                 log.debug("Method {} retrieved successfully.", functionMethod);
-                log.debug("Executing function with payload {}.", payload);
+                log.info("Executing function with payload {}.", payload);
                 log.info("Retrieving default constructor to setup the server function.");
                 Constructor<?> constructor = functionClass.getDeclaredConstructor();
                 log.debug("Default constructor retrieved successfully.");
