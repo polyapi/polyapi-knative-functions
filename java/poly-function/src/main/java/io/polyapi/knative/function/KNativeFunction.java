@@ -1,5 +1,8 @@
 package io.polyapi.knative.function;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.polyapi.commons.api.error.PolyApiExecutionException;
 import io.polyapi.commons.api.error.parse.JsonToObjectParsingException;
 import io.polyapi.commons.api.json.JsonParser;
@@ -30,6 +33,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -119,7 +123,7 @@ public class KNativeFunction {
                 log.info("Class {} instantiated successfully.", functionQualifiedName);
                 try {
                     log.debug("Parsing payload.");
-                    FunctionArguments arguments = jsonParser.parseString(payload, FunctionArguments.class);
+                    FunctionArguments arguments = inputMessage.getHeaders().containsKey("ce-id")? jsonParser.parseString(payload, TypeFactory.defaultInstance().constructCollectionType(List.class, JsonNode.class)) : jsonParser.parseString(payload, FunctionArguments.class);
                     log.debug("Parse successful.");
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();

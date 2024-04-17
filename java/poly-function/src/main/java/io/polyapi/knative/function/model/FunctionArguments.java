@@ -11,6 +11,14 @@ import java.util.Optional;
 public class FunctionArguments {
     private List<JsonNode> args;
 
+    public FunctionArguments() {
+        this(new ArrayList<>());
+    }
+
+    public FunctionArguments(List<JsonNode> args) {
+        this.args = args;
+    }
+
     public List<JsonNode> list() {
         return Optional.ofNullable(args).orElseGet(ArrayList::new);
     }
