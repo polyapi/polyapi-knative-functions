@@ -16,4 +16,9 @@ public class DefaultInvocationStrategy extends InvocationStrategy {
         log.debug("Lack of 'ce-id' header indicates the function is invoked normally.");
         return parseString(payload, FunctionArguments.class);
     }
+
+    @Override
+    public String getName() {
+        return "Default";
+    }
 }

@@ -48,4 +48,9 @@ public class TriggerInvocationStrategy extends InvocationStrategy {
                         new Metrics(start, System.currentTimeMillis()))))
                 .copyHeaders(headers).build();
     }
+
+    @Override
+    public String getName() {
+        return "Trigger";
+    }
 }
