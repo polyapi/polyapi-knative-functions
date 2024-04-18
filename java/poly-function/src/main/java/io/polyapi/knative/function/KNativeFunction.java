@@ -79,15 +79,6 @@ public class KNativeFunction {
                     .map(Boolean::parseBoolean)
                     .orElse(FALSE);
             log.info("Executing function '{}'.", functionId);
-            if (logEnabled) {
-                if (!Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
-                    Thread.currentThread().setName(LOGGING_THREAD_PREFIX.concat(Thread.currentThread().getName()));
-                }
-            } else {
-                if (Thread.currentThread().getName().startsWith(LOGGING_THREAD_PREFIX)) {
-                    Thread.currentThread().setName(Optional.of(Thread.currentThread().getName().substring(LOGGING_THREAD_PREFIX.length())).filter(not(String::isBlank)).orElse("Main"));
-                }
-            }
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
