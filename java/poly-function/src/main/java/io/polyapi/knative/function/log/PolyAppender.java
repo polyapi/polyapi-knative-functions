@@ -6,10 +6,7 @@ import ch.qos.logback.core.ConsoleAppender;
 public class PolyAppender extends ConsoleAppender<ILoggingEvent> {
     public static final String LOGGING_THREAD_PREFIX = "Poly-log-";
 
-    @Override
-    protected void append(ILoggingEvent eventObject) {
-        if (eventObject.getThreadName().startsWith(LOGGING_THREAD_PREFIX)) {
-            super.append(eventObject);
-        }
+    protected boolean isLoggingThread(ILoggingEvent eventObject) {
+        return eventObject.getThreadName().startsWith(LOGGING_THREAD_PREFIX);
     }
 }

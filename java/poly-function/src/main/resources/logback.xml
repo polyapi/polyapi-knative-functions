@@ -1,11 +1,16 @@
 <configuration>
-    <appender name="STDOUT" class="io.polyapi.knative.function.log.PolyAppender">
+    <appender name="OFFICIAL_LOGS" class="io.polyapi.knative.function.log.PolyAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] [%level]%msg[/%level]%n</pattern>
         </encoder>
     </appender>
-
+    <appender name="STANDARD_LOGS" class="io.polyapi.knative.function.log.PolyReverseAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%level] %msg%n</pattern>
+        </encoder>
+    </appender>
     <root level="info">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="OFFICIAL_LOGS" />
+        <appender-ref ref="STANDARD_LOGS" />
     </root>
 </configuration>
