@@ -22,6 +22,7 @@ public class TriggerInvocationStrategy extends InvocationStrategy {
 
     private static final String EXECUTION_ID_HEADER = "ce-executionid";
     private static final String ENVIRONMENT_ID_HEADER = "ce-environment";
+    private static final String TYPE_HEADER = "ce-type";
     private final long start;
     private final String functionId;
 
@@ -46,7 +47,10 @@ public class TriggerInvocationStrategy extends InvocationStrategy {
                         Optional.ofNullable(headers.get(ENVIRONMENT_ID_HEADER)).map(Object::toString).orElseThrow(() -> new MissingHeaderException(ENVIRONMENT_ID_HEADER)),
                         APPLICATION_JSON_VALUE,
                         new Metrics(start, System.currentTimeMillis()))))
-                .copyHeaders(headers).build();
+                .copyHeaders(headers)
+                .removeHeader(TYPE_HEADER)
+                .setHeader(TYPE_HEADER, "trigger.response")
+                .build();
     }
 
     @Override
