@@ -22,7 +22,8 @@ public abstract class InvocationStrategy {
 
     public FunctionArguments parsePayload(Object payload) {
         String stringPayload = Optional.of(payload).map(Object::toString).orElseThrow(MissingPayloadException::new);
-        log.info("Parsing payload '{}'.", payload);
+        log.debug("Parsing payload.");
+        log.trace("Payload: '{}'.", payload);
         FunctionArguments arguments = parsePayload(stringPayload);
         log.debug("Parse successful.");
         return arguments;

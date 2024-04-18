@@ -124,8 +124,8 @@ public class KNativeFunction {
                 try {
                     InvocationStrategy invocationStrategy = inputMessage.getHeaders().containsKey("ce-id") ? new TriggerInvocationStrategy(jsonParser, functionId) : new DefaultInvocationStrategy(jsonParser);
                     log.info("Invocation strategy: {}", invocationStrategy.getName());
-                    log.info("Headers");
-                    inputMessage.getHeaders().forEach((key, value) -> log.info("    \"{}\": \"{}\"", key, value));
+                    log.trace("Input headers:");
+                    inputMessage.getHeaders().forEach((key, value) -> log.trace("    \"{}\": \"{}\"", key, value));
                     FunctionArguments arguments = invocationStrategy.parsePayload(inputMessage.getPayload());
                     log.info("Executing function.");
                     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
@@ -156,9 +156,9 @@ public class KNativeFunction {
                     log.info("Function executed successfully.");
                     log.info("Handling response.");
                     Message<?> result = invocationStrategy.parseResult(methodResult, inputMessage.getHeaders());
-                    log.info("Response body is:\n {}", result.getPayload());
-                    log.info("Response headers are:\n");
-                    result.getHeaders().forEach((key, value) -> log.info("    \"{}\": \"{}\"", key, value));
+                    log.trace("Response body is:\n {}", result.getPayload());
+                    log.trace("Response headers are:\n");
+                    result.getHeaders().forEach((key, value) -> log.trace("    \"{}\": \"{}\"", key, value));
                     log.debug("Response handled successfully.");
                     log.info("Function '{}' execution complete.", functionId);
                     return result;
