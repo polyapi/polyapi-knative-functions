@@ -20,7 +20,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @Slf4j
 public class TriggerInvocationStrategy extends InvocationStrategy {
 
-    private static final String EXECUTION_ID_HEADER = "x-poly-execution-id";
+    private static final String EXECUTION_ID_HEADER = "ce-executionid";
     private static final String ENVIRONMENT_ID_HEADER = "ce-environment";
     private final long start;
     private final String functionId;
