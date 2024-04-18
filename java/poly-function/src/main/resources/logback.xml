@@ -1,5 +1,5 @@
 <configuration>
-    <appender name="OFFICIAL_LOGS" class="io.polyapi.knative.function.log.PolyAppender">
+    <appender name="OFFICIAL_LOGS" class="io.polyapi.knative.function.log.PolyDefaultAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] [%level]%msg[/%level]%n</pattern>
         </encoder>
