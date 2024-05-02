@@ -62,7 +62,7 @@ public class KNativeFunctionTest {
     private static final Logger logger = LoggerFactory.getLogger(KNativeFunctionTest.class);
     private static final String DEFAULT_SUCCESSFUL_RESULT = "";
     private static final Map<String, Object> DEFAULT_CONTENT_TYPE_HEADERS = Map.of("Content-Type", "application/json");
-    private static final Map<String, String> TRIGGER_HEADERS = Map.of("ce-id", "true", "x-poly-execution-id", "1234", "ce-environment", "asdfg");
+    private static final Map<String, String> TRIGGER_HEADERS = Map.of("ce-id", "true", "ce-executionid", "1234", "ce-environment", "asdfg");
     private static final JsonParser jsonParser = new JacksonJsonParser();
 
     @Autowired
@@ -87,7 +87,7 @@ public class KNativeFunctionTest {
                 Arguments.of("CASE 8: Execution method with Map return type.", null, MapReturningMockFunction.class.getName(), "execute", "", createBody(), null, "{\"key\":\"value\"}", DEFAULT_CONTENT_TYPE_HEADERS),
                 Arguments.of("CASE 9: Number returning function.", null, MockNumberReturningPolyCustomFunction.class.getName(), "execute", "", createBody(), null, 1, Map.of()),
                 Arguments.of("CASE 10: Multiple params function.", null, MultipleParametersFunction.class.getName(), "execute", createParamTypes(String.class, Integer.class), createBody("Test",1), null, "Test1", Map.of()),
-                Arguments.of("CASE 11: Trigger execution.", "12345678", TriggerEventFunction.class.getName(), "execute", createParamTypes(String.class, Map.class, Map.class), jsonParser.toJsonString(List.of("test", TRIGGER_HEADERS, Map.of())), TRIGGER_HEADERS, "{\"data\":\"test\",\"statusCode\":200,\"executionId\":\"1234\",\"functionId\":\"12345678\",\"environmentId\":\"asdfg\",\"contentType\":\"application/json\",\"metrics\":{\"start\":1234,\"end\":1235}}", TRIGGER_HEADERS));
+                Arguments.of("CASE 11: Trigger execution.", "12345678", TriggerEventFunction.class.getName(), "execute", createParamTypes(String.class, Map.class, Map.class), jsonParser.toJsonString(List.of("test", TRIGGER_HEADERS, Map.of())), TRIGGER_HEADERS, "{\"data\":\"test\",\"statusCode\":200,\"executionId\":\"1234\",\"functionId\":\"12345678\",\"environmentId\":\"asdfg\",\"contentType\":\"application/json\",\"metrics\":{\"start\":1234,\"end\":1235}}", Map.of("ce-id", "true", "ce-executionid", "1234", "ce-environment", "asdfg", "ce-type", "trigger.response")));
     }
 
     @ParameterizedTest(name = "{0}")
