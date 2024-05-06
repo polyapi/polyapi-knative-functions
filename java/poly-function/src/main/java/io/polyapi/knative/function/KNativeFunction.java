@@ -25,11 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.function.cloudevent.CloudEventMessageBuilder;
-import org.springframework.cloud.function.cloudevent.CloudEventMessageUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.support.ErrorMessage;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -72,18 +69,11 @@ public class KNativeFunction {
 
     @Bean
     public Function<Message<Object>, Message<?>> execute() {
-        return inputMessage -> {
-            try {
-                return process(inputMessage);
-            } catch (PolyKNativeFunctionException e) {
-                return e.toMessage();
-            }
-        };
+        return this::process;
     }
 
     private Message<?> process(Message<Object> inputMessage) {
         try {
-
             boolean logEnabled = Optional.ofNullable(inputMessage.getHeaders().get("x-poly-do-log"))
                     .map(Object::toString)
                     .map(Boolean::parseBoolean)
