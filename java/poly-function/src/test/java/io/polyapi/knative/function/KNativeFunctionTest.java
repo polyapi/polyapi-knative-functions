@@ -66,7 +66,7 @@ public class KNativeFunctionTest {
     private static final JsonParser jsonParser = new JacksonJsonParser();
 
     @Autowired
-    private KNativeFunction kNativeFunction;
+    private KNativeFunction KNativeFunction;
 
     private static String createBody(Object... args) {
         return jsonParser.toJsonString(Map.of("args", stream(args).toList()));
@@ -102,11 +102,11 @@ public class KNativeFunctionTest {
         logger.info("\n{}", titleSeparator);
         logger.info(caseTitle);
         logger.info("{}\n", titleSeparator);
-        Optional.ofNullable(functionId).ifPresent(kNativeFunction::setFunctionId);
-        Optional.ofNullable(className).ifPresent(kNativeFunction::setFunctionQualifiedName);
-        Optional.ofNullable(methodName).ifPresent(kNativeFunction::setMethodName);
-        kNativeFunction.setParameterTypes(parameterTypes);
-        Message<?> result = kNativeFunction.execute().apply(MessageBuilder.withPayload(payload).copyHeaders(Optional.ofNullable(headers).orElseGet(HashMap::new)).build());
+        Optional.ofNullable(functionId).ifPresent(KNativeFunction::setFunctionId);
+        Optional.ofNullable(className).ifPresent(KNativeFunction::setFunctionQualifiedName);
+        Optional.ofNullable(methodName).ifPresent(KNativeFunction::setMethodName);
+        KNativeFunction.setParameterTypes(parameterTypes);
+        Message<?> result = KNativeFunction.execute().apply(MessageBuilder.withPayload(payload).copyHeaders(Optional.ofNullable(headers).orElseGet(HashMap::new)).build());
         assertThat(result, notNullValue());
         assertThat(Optional.ofNullable(result.getPayload()).filter(String.class::isInstance).map(Object::toString).<Object>map(resultPayload -> resultPayload.replaceAll("\\\"start\\\":\\d*,\\\"end\\\":\\d*", "\"start\":1234,\"end\":1235")).orElse(result.getPayload()), equalTo(expectedPayload));
         Map<String, Object> returnedHeaders = new HashMap<>(result.getHeaders());
