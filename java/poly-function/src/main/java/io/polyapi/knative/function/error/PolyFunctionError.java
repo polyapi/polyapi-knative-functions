@@ -12,7 +12,11 @@ public class PolyFunctionError {
     private final Instant timestamp = Instant.now();
 
     public PolyFunctionError(PolyApiExecutionException exception) {
-        this.statusCode = exception.getStatusCode();
-        this.message = exception.getMessage();
+        this(exception.getStatusCode(), exception.getMessage());
+    }
+
+    public PolyFunctionError(Integer statusCode, String message) {
+        this.statusCode = statusCode;
+        this.message = message;
     }
 }

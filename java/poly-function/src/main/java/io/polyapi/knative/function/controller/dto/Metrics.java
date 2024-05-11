@@ -1,4 +1,4 @@
-package io.polyapi.knative.function.model;
+package io.polyapi.knative.function.controller.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

@@ -1,8 +1,5 @@
 package io.polyapi.knative.function.error.function.execution;
 
-import io.polyapi.knative.function.error.PolyKNativeFunctionException;
-import io.polyapi.knative.function.model.FunctionArguments;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.stream.Stream;
