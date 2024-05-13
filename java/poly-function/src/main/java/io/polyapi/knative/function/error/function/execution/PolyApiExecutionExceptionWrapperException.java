@@ -14,4 +14,9 @@ public class PolyApiExecutionExceptionWrapperException extends PolyKNativeFuncti
     public PolyApiExecutionExceptionWrapperException(PolyApiExecutionException cause) {
         super(format("An error occurred while executing function: %s: %s", Optional.ofNullable(cause.getCause()).map(Object::getClass).map(Class::getSimpleName).orElse("(No root exception)"), Optional.ofNullable(cause.getCause()).map(Throwable::getMessage).orElse("No message.")), cause.getStatusCode(), cause);
     }
+
+    @Override
+    public int getStatusCode() {
+        return PolyApiExecutionException.class.cast(getCause()).getStatusCode();
+    }
 }
