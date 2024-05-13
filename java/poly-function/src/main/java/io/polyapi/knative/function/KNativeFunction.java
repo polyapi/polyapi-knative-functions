@@ -17,7 +17,7 @@ public class KNativeFunction {
     }
 
     @Bean
-    public JacksonJsonParser jacksonJsonParser() {
+    public JacksonJsonParser objectMapper() {
         return new JacksonJsonParser();
     }
 }

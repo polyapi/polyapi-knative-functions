@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,8 +38,8 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
 
 @Slf4j
-@RestController
 @Setter
+@RestController
 public class InvocationController {
     private static final String TYPE_HEADER = "ce-type";
 
@@ -80,10 +81,10 @@ public class InvocationController {
 
     @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE, headers = "ce-id")
     public ResponseEntity<TriggerEventResult> trigger(@RequestHeader HttpHeaders headers,
-                                     @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
-                                     @RequestHeader("ce-executionid") String executionId,
-                                     @RequestHeader("ce-environment") String environmentId,
-                                     @RequestBody List<JsonNode> arguments) {
+                                                      @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
+                                                      @RequestHeader("ce-executionid") String executionId,
+                                                      @RequestHeader("ce-environment") String environmentId,
+                                                      @RequestBody List<JsonNode> arguments) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         Long start = System.currentTimeMillis();
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
@@ -116,8 +117,8 @@ public class InvocationController {
         return ResponseEntity.status(exception.getStatusCode()).body(exception.toErrorObject());
     }
 
-    @ExceptionHandler(JsonToObjectParsingException.class)
-    public ResponseEntity<PolyFunctionError> handleParsingException(JsonToObjectParsingException exception) {
+    @ExceptionHandler({JsonToObjectParsingException.class, HttpMessageNotReadableException.class})
+    public ResponseEntity<PolyFunctionError> handleParsingException(RuntimeException exception) {
         log.error(exception.getMessage(), exception);
         return ResponseEntity.badRequest().body(new PolyFunctionError(BAD_REQUEST.value(), exception.getMessage()));
     }

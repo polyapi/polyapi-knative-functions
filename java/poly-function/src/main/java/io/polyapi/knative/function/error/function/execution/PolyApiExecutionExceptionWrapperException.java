@@ -1,7 +1,6 @@
 package io.polyapi.knative.function.error.function.execution;
 
 import io.polyapi.commons.api.error.PolyApiExecutionException;
-import io.polyapi.knative.function.error.PolyFunctionError;
 import io.polyapi.knative.function.error.PolyKNativeFunctionException;
 
 import java.util.Optional;
@@ -17,7 +16,7 @@ public class PolyApiExecutionExceptionWrapperException extends PolyKNativeFuncti
     }
 
     @Override
-    public PolyFunctionError toErrorObject() {
-        return new PolyFunctionError(PolyApiExecutionException.class.cast(getCause()));
+    public int getStatusCode() {
+        return PolyApiExecutionException.class.cast(getCause()).getStatusCode();
     }
 }

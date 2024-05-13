@@ -7,6 +7,7 @@ import io.polyapi.commons.internal.json.JacksonJsonParser;
 import io.polyapi.knative.function.controller.dto.TriggerEventResult;
 import io.polyapi.knative.function.error.PolyFunctionError;
 import io.polyapi.knative.function.error.PolyKNativeFunctionException;
+import io.polyapi.knative.function.error.function.execution.PolyApiExecutionExceptionWrapperException;
 import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundException;
 import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
 import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
@@ -51,7 +52,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
-import static org.springframework.http.HttpStatus.*;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @Slf4j
@@ -130,7 +131,8 @@ public class InvocationControllerTest {
                 createArgumentsForInvokeError(4, "Too many arguments.", StringToStringFunction.class, join(",", String.class.getName(), Integer.class.getName()), "apply", ExecutionMethodNotFoundException.class, "Method 'apply(java.lang.String,java.lang.Integer)' is not accessible from function server class."),
                 createArgumentsForInvokeError(5, "Too few arguments.", StringToStringFunction.class, "", "apply", ExecutionMethodNotFoundException.class, "Method 'apply()' is not accessible from function server class."),
                 createArgumentsForInvokeError(6, "Non-existing argument type.", StringToStringFunction.class, "Missing", "apply", InvalidArgumentTypeException.class, "Argument of type Missing cannot be resolved by the server. Please make sure that the function is properly set."),
-                createArgumentsForInvokeError(7, "Service throws exception.", StringToStringFunction.class, String.class.getName(), "apply", MockServiceException.class, MockServiceException.MESSAGE));
+                createArgumentsForInvokeError(7, "Service throws exception.", StringToStringFunction.class, String.class.getName(), "apply", MockServiceException.class, MockServiceException.MESSAGE),
+                createArgumentsForInvokeError(8, "No param types and no execution method..", MockRunnable.class, null, "apply", ExecutionMethodNotFoundException.class, "Method 'apply()' is not accessible from function server class."));
     }
 
     private static Arguments createArgumentsForInvokeError(Integer caseNumber, String description, Class<?> functionClass, String parameterTypes, String methodName, Class<? extends Throwable> expectedExceptionClass, String expectedMessage, String... arguments) {
@@ -141,6 +143,11 @@ public class InvocationControllerTest {
                 throw new RuntimeException(e);
             }
         }).toList(), expectedExceptionClass, expectedMessage);
+    }
+
+    public static List<Arguments> handleExceptionSource() {
+        return List.of(Arguments.of(1, "Default 400 exception.", new PolyKNativeFunctionException(DEFAULT_ERROR_MESSAGE, BAD_REQUEST.value())),
+                Arguments.of(2, "Execution wrapped exception.", new PolyApiExecutionExceptionWrapperException(new PolyKNativeFunctionException(DEFAULT_ERROR_MESSAGE, BAD_REQUEST.value()))));
     }
 
     @ParameterizedTest(name = "Case {0}: {1}")
@@ -187,7 +194,6 @@ public class InvocationControllerTest {
         assertThat(exception.getMessage(), equalTo(expectedMessage));
     }
 
-
     @ParameterizedTest(name = "Case {0}: {1}")
     @MethodSource("triggerSource")
     public void triggerTest(Integer caseNumber, String description, String environmentId, String executionId, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, Object expectedBody, Map<String, String> expectedHeaders) throws ClassNotFoundException {
@@ -211,6 +217,9 @@ public class InvocationControllerTest {
         assertThat(body.getEnvironmentId(), equalTo(environmentId));
         assertThat(body.getExecutionId(), equalTo(executionId));
         assertThat(body.getStatusCode(), equalTo(200));
+        assertThat(body.getFunctionId(), equalTo(functionId));
+        assertThat(body.getMetrics().getStart(), notNullValue());
+        assertThat(body.getMetrics().getEnd(), notNullValue());
         assertThat(body.getData(), equalTo(Optional.ofNullable(expectedBody).orElse("")));
         Map<String, String> expectedResultingHeaders = new HashMap<>(expectedHeaders);
         expectedResultingHeaders.put("ce-type", "trigger.response");
@@ -220,18 +229,15 @@ public class InvocationControllerTest {
         Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled));
     }
 
-    @Test
-    public void handleExceptionTest() {
+    @ParameterizedTest(name = "Case {0}: {1}")
+    @MethodSource("handleExceptionSource")
+    public void handleExceptionTest(Integer caseNumber, String description, PolyKNativeFunctionException mockException) {
+        describeErrorCase(caseNumber, description);
         InvocationController controller = new InvocationController();
-        PolyKNativeFunctionException mockException = Mockito.mock(PolyKNativeFunctionException.class);
-        Mockito.when(mockException.toErrorObject()).thenReturn(new PolyFunctionError(INTERNAL_SERVER_ERROR.value(), DEFAULT_ERROR_MESSAGE));
-        Mockito.when(mockException.getStatusCode()).thenReturn(INTERNAL_SERVER_ERROR.value());
         ResponseEntity<PolyFunctionError> result = controller.handleException(mockException);
-        assertThat(result.getStatusCode(), equalTo(INTERNAL_SERVER_ERROR));
-        assertThat(result.getBody().getStatusCode(), equalTo(INTERNAL_SERVER_ERROR.value()));
-        assertThat(result.getBody().getMessage(), equalTo(DEFAULT_ERROR_MESSAGE));
-        Mockito.verify(mockException).toErrorObject();
-        Mockito.verify(mockException).getStatusCode();
+        assertThat(result.getStatusCode(), equalTo(HttpStatus.valueOf(mockException.getStatusCode())));
+        assertThat(result.getBody().getStatusCode(), equalTo(mockException.getStatusCode()));
+        assertThat(result.getBody().getMessage(), equalTo(mockException.getMessage()));
     }
 
     @Test
