@@ -31,6 +31,8 @@ import org.springframework.test.context.TestPropertySource;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import static io.polyapi.knative.function.TestCaseDescriber.describeCase;
+import static io.polyapi.knative.function.TestCaseDescriber.describeErrorCase;
 import static io.polyapi.knative.function.mock.function.StringSupplier.DEFAULT_RESULT;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -45,7 +47,8 @@ public class InvocationServiceImplTest {
                 createArguments(2, "Consumer invocation.", StatefulObjectConsumer.class, getMethod(StatefulObjectConsumer.class, "accept", StatefulObject.class), true, null, new StatefulObject()),
                 createArguments(3, "Bi-function invocation.", StringIntegerToStringBiFunction.class, getMethod(StringIntegerToStringBiFunction.class, "apply", String.class, Integer.class), true, "case 3", "case ", 3),
                 createArguments(4, "Supplier invocation.", StringSupplier.class, getMethod(StringSupplier.class, "get"), true, DEFAULT_RESULT),
-                createArguments(5, "Runnable invocation.", MockRunnable.class, getMethod(MockRunnable.class, "run"), true, null));
+                createArguments(5, "Runnable invocation.", MockRunnable.class, getMethod(MockRunnable.class, "run"), true, null),
+                createArguments(6, "Poly logs disabled.", StringToStringFunction.class, getMethod(StringToStringFunction.class,"apply", String.class), false, "6 esac", "case 6"));
     }
 
     private static Arguments createArguments(Integer caseNumber, String description, Class<?> clazz, Method method, boolean logsEnabled, Object expectedResult, Object... arguments) {
@@ -78,8 +81,7 @@ public class InvocationServiceImplTest {
     @ParameterizedTest(name = "Case {0}: {1}")
     @MethodSource("invokeFunctionSource")
     public void invokeFunctionTest(Integer caseNumber, String description, Class<?> clazz, Method method, Object[] arguments, boolean logsEnabled, Object expectedResult) {
-        log.info("-------------------------- Case {} --------------------------", caseNumber);
-        log.info(description);
+        describeCase(caseNumber, description);
         InvocationServiceImpl invocationService = new InvocationServiceImpl();
         invocationService.setFunctionId("Test function " + method);
         for (Object object : arguments) {
@@ -98,8 +100,7 @@ public class InvocationServiceImplTest {
     @ParameterizedTest(name = "Error case {0}: {1}")
     @MethodSource("invokeFunctionErrorSource")
     public void invokeFunctionErrorTest(Integer caseNumber, String description, Class<?> clazz, Method method, Object[] arguments, boolean logsEnabled, Class<? extends PolyKNativeFunctionException> expectedException, String expectedErrorMessage) {
-        log.info("----------------------- Error Case {} -----------------------", caseNumber);
-        log.info(description);
+        describeErrorCase(caseNumber, description);
         InvocationServiceImpl invocationService = new InvocationServiceImpl();
         invocationService.setFunctionId("Error Test function " + method);
         PolyKNativeFunctionException exception = assertThrows(expectedException, () -> invocationService.invokeFunction(clazz, method, arguments, logsEnabled));

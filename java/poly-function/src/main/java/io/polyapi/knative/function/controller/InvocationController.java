@@ -79,18 +79,18 @@ public class InvocationController {
     }
 
     @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE, headers = "ce-id")
-    public ResponseEntity<?> handleMessage(@RequestHeader HttpHeaders headers,
-                                           @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
-                                           @RequestHeader("ce-executionid") String executionId,
-                                           @RequestHeader("ce-environment") String environmentId,
-                                           @RequestBody List<JsonNode> arguments) {
+    public ResponseEntity<TriggerEventResult> trigger(@RequestHeader HttpHeaders headers,
+                                     @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
+                                     @RequestHeader("ce-executionid") String executionId,
+                                     @RequestHeader("ce-environment") String environmentId,
+                                     @RequestBody List<JsonNode> arguments) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         Long start = System.currentTimeMillis();
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
         Object invocationResult = invokeFunction(arguments, logsEnabled);
         log.info("Function executed successfully.");
         log.info("Handling response.");
-        ResponseEntity<?> result = ResponseEntity.ok().headers(headers)
+        ResponseEntity<TriggerEventResult> result = ResponseEntity.ok().headers(headers)
                 .headers(outputHeaders -> {
                     outputHeaders.remove(CONTENT_LENGTH);
                     outputHeaders.remove(CONTENT_LENGTH.toLowerCase());
