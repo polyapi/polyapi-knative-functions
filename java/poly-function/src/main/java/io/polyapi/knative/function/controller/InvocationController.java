@@ -124,8 +124,6 @@ public class InvocationController {
 
     private InvocationResult invokeFunction(List<JsonNode> arguments, boolean logsEnabled, String executionId) {
         try {
-            log.info("ARGS SIZE: {}", arguments.size());
-            log.info("ARGS: {}", arguments);
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
@@ -152,11 +150,12 @@ public class InvocationController {
                             }
                         })
                         .toArray(Class<?>[]::new);
-                log.info("Parameter types loaded successfully.");
+                log.debug("Parameter types loaded successfully.");
                 log.info("Retrieving method {}.{}({}).", functionQualifiedName, methodName, parameterTypes);
                 functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
-                log.info("Method {} retrieved successfully.", functionMethod);
+                log.debug("Method {} retrieved successfully.", functionMethod);
             }
+            log.info("ARGS: {}", arguments);
             log.info("FUNCTION METHODS: {}", functionMethod.getParameters());
             return invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
                     .peek(i -> {
