@@ -157,6 +157,10 @@ public class InvocationController {
             }
             log.info("FUNCTION METHODS: {}", functionMethod.getParameters());
             return invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
+                    .peek(i -> {
+                                log.info("I spot a bug! {}", i);
+                                log.info("ARGUMENTS: {}", arguments);
+                            })
                     .map(i -> {
                         log.info("I: {}", i);
                         return jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType());
