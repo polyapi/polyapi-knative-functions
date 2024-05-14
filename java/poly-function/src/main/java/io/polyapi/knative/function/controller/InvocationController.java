@@ -154,6 +154,10 @@ public class InvocationController {
                 log.debug("Method {} retrieved successfully.", functionMethod);
             }
             return invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
+                            .peek(i -> {
+                                log.info("I spot a bug! {}", i);
+                                log.info("ARGUMENTS: {}", arguments);
+                            })
                     .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
                     .toArray(), logsEnabled, executionId);
         } catch (NoSuchMethodException e) {
