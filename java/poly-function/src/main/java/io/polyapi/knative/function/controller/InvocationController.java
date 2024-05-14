@@ -10,6 +10,7 @@ import io.polyapi.knative.function.error.PolyKNativeFunctionException;
 import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundException;
 import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
 import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
+import io.polyapi.knative.function.model.InvocationResult;
 import io.polyapi.knative.function.service.InvocationService;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ import java.util.Optional;
 
 import static java.util.function.Predicate.not;
 import static java.util.stream.IntStream.range;
-import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
+import static org.springframework.http.HttpHeaders.*;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
@@ -63,20 +64,13 @@ public class InvocationController {
 
     @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = {APPLICATION_JSON_VALUE, TEXT_PLAIN_VALUE})
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
+                                    @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
-        Object methodResult = invokeFunction(arguments.get("args"), logsEnabled);
-        ResponseEntity<?> result;
-        if (methodResult instanceof Number || methodResult instanceof String) {
-            log.debug("Result is a number or a string. Skipping conversion to JSon.");
-            result = ResponseEntity.ok(methodResult);
-        } else {
-            log.debug("Result is not a number nor a string. Converting to Json.");
-            result = ResponseEntity.ok()
-                    .header("Content-Type", "application/json")
-                    .body(methodResult);
-        }
-        return result;
+        InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
+        return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
+                .header(CONTENT_TYPE, methodResult.getMetadata().getResponseContentType())
+                .body(methodResult.getData().orElse(""));
     }
 
     @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE, headers = "ce-id")
@@ -88,23 +82,26 @@ public class InvocationController {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         Long start = System.currentTimeMillis();
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
-        Object invocationResult = invokeFunction(arguments, logsEnabled);
+        InvocationResult invocationResult = invokeFunction(arguments, logsEnabled, executionId);
         log.info("Function executed successfully.");
         log.info("Handling response.");
-        ResponseEntity<TriggerEventResult> result = ResponseEntity.ok().headers(headers)
+        ResponseEntity<TriggerEventResult> result = ResponseEntity.status(invocationResult.getMetadata().getResponseStatusCode())
+                .headers(headers)
                 .headers(outputHeaders -> {
                     outputHeaders.remove(CONTENT_LENGTH);
                     outputHeaders.remove(CONTENT_LENGTH.toLowerCase());
                     outputHeaders.remove(TYPE_HEADER);
+                    outputHeaders.remove(CONTENT_TYPE);
                 })
+                .header(CONTENT_TYPE, invocationResult.getMetadata().getResponseContentType())
                 .header(TYPE_HEADER, "trigger.response")
-                .body(new TriggerEventResult(200,
-                        executionId,
+                .body(new TriggerEventResult(invocationResult.getMetadata().getResponseStatusCode(),
+                        invocationResult.getMetadata().getExecutionId(),
                         functionId,
                         environmentId,
                         APPLICATION_JSON_VALUE,
                         new Metrics(start, System.currentTimeMillis()),
-                        invocationResult));
+                        invocationResult.getData().orElse("")));
         log.trace("Response headers are:\n");
         result.getHeaders().forEach((key, value) -> log.trace("    \"{}\": \"{}\"", key, value));
         log.debug("Response handled successfully.");
@@ -123,7 +120,7 @@ public class InvocationController {
         return ResponseEntity.badRequest().body(new PolyFunctionError(BAD_REQUEST.value(), exception.getMessage()));
     }
 
-    private Object invokeFunction(List<JsonNode> arguments, boolean logsEnabled) {
+    private InvocationResult invokeFunction(List<JsonNode> arguments, boolean logsEnabled, String executionId) {
         try {
             log.info("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
@@ -156,10 +153,9 @@ public class InvocationController {
                 functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
                 log.debug("Method {} retrieved successfully.", functionMethod);
             }
-            return Optional.ofNullable(invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
-                            .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
-                            .toArray(), logsEnabled))
-                    .orElse("");
+            return invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
+                    .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
+                    .toArray(), logsEnabled, executionId);
         } catch (NoSuchMethodException e) {
             throw new ExecutionMethodNotFoundException(methodName, parameterTypes, e);
         } catch (ClassNotFoundException e) {
