@@ -66,6 +66,8 @@ public class InvocationController {
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
+        log.info("Executing function '{}'", functionId);
+        log.info("ARGUMENTS INITIAL: {} ", arguments.get("args"));
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
         return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
