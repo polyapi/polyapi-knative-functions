@@ -1,5 +1,7 @@
 package io.polyapi.knative.function.service;
 
+import io.polyapi.knative.function.model.InvocationResult;
+
 import java.lang.reflect.Method;
 
 /**
@@ -14,7 +16,8 @@ public interface InvocationService {
      * @param method The method of the function to execute.
      * @param arguments  The arguments with which the function will be executed.
      * @param logsEnabled Flag indicating if logs should be enabled.
-     * @return Object The result of the function call. Void if no result is available.
+     * @param executionId The execution ID of the function.
+     * @return InvocationResult The result of the function call. Contains the data with the function result (null in case no result is returned) and the PolyCustom metadata.
      */
-    Object invokeFunction(Class<?> clazz, Method method, Object[] arguments, boolean logsEnabled);
+    InvocationResult invokeFunction(Class<?> clazz, Method method, Object[] arguments, boolean logsEnabled, String executionId);
 }

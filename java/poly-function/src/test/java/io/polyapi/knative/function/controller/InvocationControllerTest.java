@@ -2,6 +2,7 @@ package io.polyapi.knative.function.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.polyapi.client.api.model.function.PolyCustom;
 import io.polyapi.commons.api.error.parse.JsonToObjectParsingException;
 import io.polyapi.commons.internal.json.JacksonJsonParser;
 import io.polyapi.knative.function.controller.dto.TriggerEventResult;
@@ -21,6 +22,7 @@ import io.polyapi.knative.function.mock.function.StatefulObjectConsumer;
 import io.polyapi.knative.function.mock.function.StatefulObjectSupplier;
 import io.polyapi.knative.function.mock.function.StringSupplier;
 import io.polyapi.knative.function.mock.function.StringToStringFunction;
+import io.polyapi.knative.function.model.InvocationResult;
 import io.polyapi.knative.function.service.InvocationService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -53,11 +55,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.OK;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @Slf4j
 public class InvocationControllerTest {
     private static final String DEFAULT_FUNCTION_ID = "test-function-id";
+    private static final String DEFAULT_EXECUTION_ID = "test-execution-id";
+    private static final String DEFAULT_API_KEY = "test-execution-id";
     private static final String DEFAULT_ERROR_MESSAGE = "Error!";
     private InvocationService invocationService;
     private static final JacksonJsonParser jsonParser = new JacksonJsonParser();
@@ -69,24 +74,25 @@ public class InvocationControllerTest {
                 createArgumentsForInvoke(4, "Invoking function without params but with String result.", StringSupplier.class, List.of(), "get", "Result"),
                 createArgumentsForInvoke(5, "Invoking function without params but with Integer result.", IntegerSupplier.class, List.of(), "get", 1),
                 createArgumentsForInvoke(6, "Invoking function without params nor result.", MockRunnable.class, List.of(), "run", null),
-                createArgumentsForInvoke(7, "Setting logsEnabled to false.", DEFAULT_FUNCTION_ID, MockRunnable.class.getName(), List.of(), "run", false, null),
-                createArgumentsForInvoke(8, "Setting functionId to null.", null, MockRunnable.class.getName(), List.of(), "run", true, null),
-                createArgumentsForInvoke(9, "Setting parameter types to null.", DEFAULT_FUNCTION_ID, PolyCustomFunction.class.getName(), null, "execute", true, DEFAULT_RESULT),
+                createArgumentsForInvoke(7, "Setting logsEnabled to false.", DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, MockRunnable.class.getName(), List.of(), "run", false, null),
+                createArgumentsForInvoke(8, "Setting functionId to null.", null, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, MockRunnable.class.getName(), List.of(), "run", true, null),
+                createArgumentsForInvoke(9, "Setting parameter types to null.", DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, PolyCustomFunction.class.getName(), null, "execute", true, DEFAULT_RESULT),
                 createArgumentsForInvoke(10, "Private execution method (Delegates failure to the service layer).", PrivateMethodClass.class, List.of(), "get", null));
     }
 
     private static Arguments createArgumentsForInvoke(Integer caseNumber, String description, Class<?> functionClass, List<Class<?>> parameterTypes, String methodName, Object expectedBody, Object... arguments) {
-        return createArgumentsForInvoke(caseNumber, description, DEFAULT_FUNCTION_ID, functionClass.getName(), parameterTypes.stream().map(Class::getName).toList(), methodName, true, expectedBody, Arrays.stream(arguments).map(jsonParser::toJsonString).toArray(String[]::new));
+        return createArgumentsForInvoke(caseNumber, description, DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, functionClass.getName(), parameterTypes.stream().map(Class::getName).toList(), methodName, true, expectedBody, Arrays.stream(arguments).map(jsonParser::toJsonString).toArray(String[]::new));
     }
 
-    private static Arguments createArgumentsForInvoke(Integer caseNumber, String description, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, Object expectedBody, String... arguments) {
+    private static Arguments createArgumentsForInvoke(Integer caseNumber, String description, String functionId, String executionId, String apiKey, Integer responseStatusCode, String responseContentType, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, Object expectedBody, String... arguments) {
+
         return Arguments.of(caseNumber, description, functionId, functionQualifiedName, parameterTypes, methodName, logsEnabled, Arrays.stream(arguments).map(argument -> {
             try {
                 return jsonParser.readTree(argument);
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
-        }).toList(), expectedBody, expectedBody == null || expectedBody instanceof Integer || expectedBody instanceof String ? new HashMap<>() : Map.of(CONTENT_TYPE, APPLICATION_JSON_VALUE));
+        }).toList(), new InvocationResult(expectedBody, new PolyCustom(executionId, apiKey, responseStatusCode, responseContentType)), Map.of(CONTENT_TYPE, responseContentType));
     }
 
 
@@ -106,22 +112,21 @@ public class InvocationControllerTest {
     private static Arguments createArgumentsForTrigger(Object... arguments) {
         List<Object> result = Arrays.stream(arguments).collect(Collectors.toList());
         result.add(2, "sample");
-        result.add(2, "sample");
         return Arguments.of(result.toArray());
     }
 
     private static Arguments createArgumentsForTrigger(Integer caseNumber, String description, String executionId, String environmentId, Class<?> functionClass, List<Class<?>> parameterTypes, String methodName, Object expectedBody, Object... arguments) {
-        return createArgumentsForTrigger(caseNumber, description, DEFAULT_FUNCTION_ID, executionId, environmentId, functionClass.getName(), parameterTypes.stream().map(Class::getName).toList(), methodName, true, expectedBody, Arrays.stream(arguments).map(jsonParser::toJsonString).toArray(String[]::new));
+        return createArgumentsForTrigger(caseNumber, description, DEFAULT_FUNCTION_ID, executionId, environmentId, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, functionClass.getName(), parameterTypes.stream().map(Class::getName).toList(), methodName, true, expectedBody, Arrays.stream(arguments).map(jsonParser::toJsonString).toArray(String[]::new));
     }
 
-    private static Arguments createArgumentsForTrigger(Integer caseNumber, String description, String executionId, String environmentId, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, Object expectedBody, String... arguments) {
-        return Arguments.of(caseNumber, description, executionId, environmentId, functionId, functionQualifiedName, parameterTypes, methodName, logsEnabled, Arrays.stream(arguments).map(argument -> {
+    private static Arguments createArgumentsForTrigger(Integer caseNumber, String description, String functionId, String executionId, String environmentId, String apiKey, Integer responseStatusCode, String responseContentType, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, Object expectedBody, String... arguments) {
+        return Arguments.of(caseNumber, description, functionId, environmentId, functionQualifiedName, parameterTypes, methodName, logsEnabled, Arrays.stream(arguments).map(argument -> {
             try {
                 return jsonParser.readTree(argument);
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
-        }).toList(), expectedBody, expectedBody == null || expectedBody instanceof Integer || expectedBody instanceof String ? new HashMap<>() : Map.of(CONTENT_TYPE, APPLICATION_JSON_VALUE));
+        }).toList(), new InvocationResult(expectedBody, new PolyCustom(executionId, apiKey, responseStatusCode, responseContentType)), Map.of(CONTENT_TYPE, responseContentType));
     }
 
     public static List<Arguments> invokeErrorSource() {
@@ -136,7 +141,7 @@ public class InvocationControllerTest {
     }
 
     private static Arguments createArgumentsForInvokeError(Integer caseNumber, String description, Class<?> functionClass, String parameterTypes, String methodName, Class<? extends Throwable> expectedExceptionClass, String expectedMessage, String... arguments) {
-        return Arguments.of(caseNumber, description, DEFAULT_FUNCTION_ID, Optional.ofNullable(functionClass).map(Class::getName).orElse("Missing"), parameterTypes, methodName, true, Arrays.stream(arguments).map(argument -> {
+        return Arguments.of(caseNumber, description, DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, Optional.ofNullable(functionClass).map(Class::getName).orElse("Missing"), parameterTypes, methodName, true, Arrays.stream(arguments).map(argument -> {
             try {
                 return jsonParser.readTree(argument);
             } catch (JsonProcessingException e) {
@@ -152,7 +157,7 @@ public class InvocationControllerTest {
 
     @ParameterizedTest(name = "Case {0}: {1}")
     @MethodSource("invokeSource")
-    public void invokeTest(Integer caseNumber, String description, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, Object expectedBody, Map<String, String> expectedHeaders) throws ClassNotFoundException {
+    public void invokeTest(Integer caseNumber, String description, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, InvocationResult invocationResult, Map<String, String> expectedHeaders) throws ClassNotFoundException {
         describeCase(caseNumber, description);
         InvocationController controller = new InvocationController();
         controller.setFunctionId(functionId);
@@ -160,11 +165,11 @@ public class InvocationControllerTest {
         Optional.ofNullable(parameterTypes).map(types -> join(",", types)).ifPresent(controller::setParameterTypes);
         controller.setMethodName(methodName);
         invocationService = Mockito.mock(InvocationService.class);
-        Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled))).thenReturn(expectedBody);
+        Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()))).thenReturn(invocationResult);
         controller.setInvocationService(invocationService);
         controller.setJsonParser(jsonParser);
-        ResponseEntity<?> result = controller.invoke(logsEnabled, Map.of("args", arguments));
-        assertThat(result.getBody(), equalTo(Optional.ofNullable(expectedBody).orElse("")));
+        ResponseEntity<?> result = controller.invoke(logsEnabled, invocationResult.getMetadata().getExecutionId(), Map.of("args", arguments));
+        assertThat(result.getBody(), equalTo(invocationResult.getData().orElse("")));
         assertThat(result.getHeaders().keySet(), equalTo(expectedHeaders.keySet()));
         if (expectedHeaders.containsKey(CONTENT_TYPE)) {
             Optional.ofNullable(result.getHeaders().get(CONTENT_TYPE))
@@ -172,12 +177,12 @@ public class InvocationControllerTest {
                     .flatMap(List::stream)
                     .forEach(header -> assertThat(header, equalTo(expectedHeaders.get(CONTENT_TYPE))));
         }
-        Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled));
+        Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()));
     }
 
     @ParameterizedTest(name = "Case {0}: {1}")
     @MethodSource("invokeErrorSource")
-    public void invokeErrorTest(Integer caseNumber, String description, String functionId, String functionQualifiedName, String parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, Class<? extends Throwable> expectedException, String expectedMessage) throws Exception {
+    public void invokeErrorTest(Integer caseNumber, String description, String functionId, String executionId, String functionQualifiedName, String parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, Class<? extends Throwable> expectedException, String expectedMessage) throws Exception {
         describeErrorCase(caseNumber, description);
         InvocationController controller = new InvocationController();
         controller.setFunctionId(functionId);
@@ -186,17 +191,17 @@ public class InvocationControllerTest {
         controller.setMethodName(methodName);
         invocationService = Mockito.mock(InvocationService.class);
         if (expectedException.equals(MockServiceException.class)) {
-            Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled))).thenThrow(expectedException.getDeclaredConstructor().newInstance());
+            Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled), eq(executionId))).thenThrow(expectedException.getDeclaredConstructor().newInstance());
         }
         controller.setInvocationService(invocationService);
         controller.setJsonParser(jsonParser);
-        Throwable exception = assertThrows(expectedException, () -> controller.invoke(logsEnabled, Map.of("args", arguments)));
+        Throwable exception = assertThrows(expectedException, () -> controller.invoke(logsEnabled, executionId, Map.of("args", arguments)));
         assertThat(exception.getMessage(), equalTo(expectedMessage));
     }
 
     @ParameterizedTest(name = "Case {0}: {1}")
     @MethodSource("triggerSource")
-    public void triggerTest(Integer caseNumber, String description, String environmentId, String executionId, String functionId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, Object expectedBody, Map<String, String> expectedHeaders) throws ClassNotFoundException {
+    public void triggerTest(Integer caseNumber, String description, String functionId, String environmentId, String functionQualifiedName, List<String> parameterTypes, String methodName, boolean logsEnabled, List<JsonNode> arguments, InvocationResult invocationResult, Map<String, String> expectedHeaders) throws ClassNotFoundException {
         describeCase(caseNumber, description);
         InvocationController controller = new InvocationController();
         controller.setFunctionId(functionId);
@@ -204,29 +209,29 @@ public class InvocationControllerTest {
         Optional.ofNullable(parameterTypes).map(types -> join(",", types)).ifPresent(controller::setParameterTypes);
         controller.setMethodName(methodName);
         invocationService = Mockito.mock(InvocationService.class);
-        Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled))).thenReturn(expectedBody);
+        Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()))).thenReturn(invocationResult);
         controller.setInvocationService(invocationService);
         controller.setJsonParser(jsonParser);
         HttpHeaders headers = new HttpHeaders();
         headers.put("sample", List.of(UUID.randomUUID().toString()));
-        headers.put(CONTENT_TYPE, List.of(APPLICATION_JSON_VALUE));
-        ResponseEntity<TriggerEventResult> result = controller.trigger(headers, logsEnabled, executionId, environmentId, arguments);
+        headers.put(CONTENT_TYPE, List.of(invocationResult.getMetadata().getResponseContentType()));
+        ResponseEntity<TriggerEventResult> result = controller.trigger(headers, logsEnabled, invocationResult.getMetadata().getExecutionId(), environmentId, arguments);
         TriggerEventResult body = result.getBody();
         assertThat(body, not(nullValue()));
         assertThat(body.getContentType(), equalTo(APPLICATION_JSON_VALUE));
         assertThat(body.getEnvironmentId(), equalTo(environmentId));
-        assertThat(body.getExecutionId(), equalTo(executionId));
-        assertThat(body.getStatusCode(), equalTo(200));
+        assertThat(body.getExecutionId(), equalTo(invocationResult.getMetadata().getExecutionId()));
+        assertThat(body.getStatusCode(), equalTo(invocationResult.getMetadata().getResponseStatusCode()));
         assertThat(body.getFunctionId(), equalTo(functionId));
         assertThat(body.getMetrics().getStart(), notNullValue());
         assertThat(body.getMetrics().getEnd(), notNullValue());
-        assertThat(body.getData(), equalTo(Optional.ofNullable(expectedBody).orElse("")));
+        assertThat(body.getData(), equalTo(invocationResult.getData().orElse("")));
         Map<String, String> expectedResultingHeaders = new HashMap<>(expectedHeaders);
         expectedResultingHeaders.put("ce-type", "trigger.response");
         headers.forEach((key, value) -> expectedResultingHeaders.put(key, value.get(0)));
         assertThat(result.getHeaders().size(), equalTo(expectedResultingHeaders.size()));
         expectedResultingHeaders.forEach((key, value) -> assertThat(value, equalTo(result.getHeaders().getFirst(key))));
-        Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled));
+        Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()));
     }
 
     @ParameterizedTest(name = "Case {0}: {1}")
