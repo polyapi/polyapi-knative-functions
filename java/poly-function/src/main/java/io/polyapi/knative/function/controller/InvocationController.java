@@ -66,8 +66,6 @@ public class InvocationController {
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
-        log.info("Executing function '{}'", functionId);
-        log.info("ARGUMENTS INITIAL: {} ", arguments.get("args"));
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
         return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
@@ -85,8 +83,7 @@ public class InvocationController {
         Long start = System.currentTimeMillis();
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
         InvocationResult invocationResult = invokeFunction(arguments, logsEnabled, executionId);
-        log.info("Function executed successfully.");
-        log.info("Handling response.");
+        log.debug("Handling response.");
         ResponseEntity<TriggerEventResult> result = ResponseEntity.status(invocationResult.getMetadata().getResponseStatusCode())
                 .headers(headers)
                 .headers(outputHeaders -> {
@@ -124,7 +121,7 @@ public class InvocationController {
 
     private InvocationResult invokeFunction(List<JsonNode> arguments, boolean logsEnabled, String executionId) {
         try {
-            log.info("Loading class {}.", functionQualifiedName);
+            log.debug("Loading class {}.", functionQualifiedName);
             Class<?> functionClass = Class.forName(functionQualifiedName);
             log.debug("Class {} loaded successfully.", functionQualifiedName);
             Method functionMethod;
@@ -132,7 +129,7 @@ public class InvocationController {
             if (parameterTypes == null) {
                 functionMethod = Arrays.stream(functionClass.getDeclaredMethods()).filter(method -> method.getName().equals(methodName)).findFirst().orElseThrow(() -> new ExecutionMethodNotFoundException(methodName));
             } else {
-                log.info("Loading parameter types: [{}].", parameterTypes);
+                log.debug("Loading parameter types: [{}].", parameterTypes);
                 paramTypes = Optional.of(parameterTypes)
                         .filter(not(String::isBlank))
                         .map(params -> params.split(","))
@@ -151,7 +148,7 @@ public class InvocationController {
                         })
                         .toArray(Class<?>[]::new);
                 log.debug("Parameter types loaded successfully.");
-                log.info("Retrieving method {}.{}({}).", functionQualifiedName, methodName, parameterTypes);
+                log.debug("Retrieving method {}.{}({}).", functionQualifiedName, methodName, parameterTypes);
                 functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
                 log.debug("Method {} retrieved successfully.", functionMethod);
             }
