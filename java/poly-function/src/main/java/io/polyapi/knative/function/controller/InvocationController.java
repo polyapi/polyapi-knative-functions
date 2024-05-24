@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -84,7 +85,7 @@ public class InvocationController {
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
         InvocationResult invocationResult = invokeFunction(arguments, logsEnabled, executionId);
         log.debug("Handling response.");
-        ResponseEntity<TriggerEventResult> result = ResponseEntity.status(invocationResult.getMetadata().getResponseStatusCode())
+        ResponseEntity<TriggerEventResult> result = ResponseEntity.ok()
                 .headers(headers)
                 .headers(outputHeaders -> {
                     outputHeaders.remove(CONTENT_LENGTH);
@@ -92,13 +93,13 @@ public class InvocationController {
                     outputHeaders.remove(TYPE_HEADER);
                     outputHeaders.remove(CONTENT_TYPE);
                 })
-                .header(CONTENT_TYPE, invocationResult.getMetadata().getResponseContentType())
+                .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
                 .header(TYPE_HEADER, "trigger.response")
                 .body(new TriggerEventResult(invocationResult.getMetadata().getResponseStatusCode(),
                         invocationResult.getMetadata().getExecutionId(),
                         functionId,
                         environmentId,
-                        APPLICATION_JSON_VALUE,
+                        invocationResult.getMetadata().getResponseContentType(),
                         new Metrics(start, System.currentTimeMillis()),
                         invocationResult.getData().orElse("")));
         log.trace("Response headers are:\n");
