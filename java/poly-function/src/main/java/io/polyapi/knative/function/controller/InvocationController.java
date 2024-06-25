@@ -30,6 +30,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.function.Predicate.not;
@@ -153,8 +154,8 @@ public class InvocationController {
                 functionMethod = functionClass.getDeclaredMethod(methodName, paramTypes);
                 log.debug("Method {} retrieved successfully.", functionMethod);
             }
-            return invocationService.invokeFunction(functionClass, functionMethod, range(0, arguments.size()).boxed()
-                    .map(i -> jsonParser.parseString(arguments.get(i).toString(), functionMethod.getParameters()[i].getParameterizedType()))
+            return invocationService.invokeFunction(functionClass, functionMethod, range(0, functionMethod.getParameters().length).boxed()
+                    .map(i -> Optional.ofNullable(arguments).filter(args -> args.size() > i).map(args -> args.get(i)).map(Object::toString).map(arg -> jsonParser.parseString(arg, functionMethod.getParameters()[i].getParameterizedType())).orElse(null))
                     .toArray(), logsEnabled, executionId);
         } catch (NoSuchMethodException e) {
             throw new ExecutionMethodNotFoundException(methodName, parameterTypes, e);

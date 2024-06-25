@@ -22,13 +22,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static io.polyapi.knative.function.log.PolyAppender.LOGGING_THREAD_PREFIX;
+import static java.lang.Math.min;
 import static java.lang.String.format;
 import static org.springframework.http.HttpStatus.OK;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
@@ -68,7 +68,7 @@ public class InvocationServiceImpl implements InvocationService {
                             }
                         });
                         log.info("Executing function '{}'.", functionId);
-                        Object result = method.invoke(function, arguments);
+                        Object result = method.invoke(function, Arrays.stream(arguments).toList().subList(0, min(method.getParameters().length, arguments.length)).toArray());
                         log.info("Function '{}' executed successfully.", functionId);
                         completableFuture.complete(result);
                     } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
