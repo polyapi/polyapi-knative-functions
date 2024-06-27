@@ -139,14 +139,27 @@ public class InvocationController {
                         .flatMap(Arrays::stream)
                         .map(String::trim)
                         .map(qualifiedName -> {
-                            try {
-                                log.debug("Loading class for parameter type '{}'.", qualifiedName);
-                                Class<?> result = Class.forName(qualifiedName);
+                            log.debug("Loading class for parameter type '{}'.", qualifiedName);
+                            Class<?> result = switch (qualifiedName) {
+                                case "boolean" -> boolean.class;
+                                case "byte" -> byte.class;
+                                case "short" -> short.class;
+                                case "int" -> int.class;
+                                case "long" -> long.class;
+                                case "float" -> float.class;
+                                case "double" -> double.class;
+                                case "char" -> char.class;
+                                case "void" -> void.class;
+                                default -> {
+                                    try {
+                                        yield Class.forName(qualifiedName);
+                                    } catch (ClassNotFoundException e) {
+                                        throw new InvalidArgumentTypeException(qualifiedName, e);
+                                    }
+                                }
+                            };
                                 log.debug("Class loaded successfully.");
                                 return result;
-                            } catch (ClassNotFoundException e) {
-                                throw new InvalidArgumentTypeException(qualifiedName, e);
-                            }
                         })
                         .toArray(Class<?>[]::new);
                 log.debug("Parameter types loaded successfully.");

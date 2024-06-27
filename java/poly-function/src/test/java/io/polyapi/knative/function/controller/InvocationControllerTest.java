@@ -13,6 +13,7 @@ import io.polyapi.knative.function.error.function.state.ExecutionMethodNotFoundE
 import io.polyapi.knative.function.error.function.state.InvalidArgumentTypeException;
 import io.polyapi.knative.function.error.function.state.PolyFunctionNotFoundException;
 import io.polyapi.knative.function.mock.exception.MockServiceException;
+import io.polyapi.knative.function.mock.function.IntFunction;
 import io.polyapi.knative.function.mock.function.IntegerSupplier;
 import io.polyapi.knative.function.mock.function.MockRunnable;
 import io.polyapi.knative.function.mock.function.PolyCustomFunction;
@@ -47,6 +48,7 @@ import static io.polyapi.knative.function.TestCaseDescriber.describeCase;
 import static io.polyapi.knative.function.TestCaseDescriber.describeErrorCase;
 import static io.polyapi.knative.function.mock.function.PolyCustomFunction.DEFAULT_RESULT;
 import static java.lang.String.join;
+import static java.util.stream.Collectors.toList;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,7 +79,8 @@ public class InvocationControllerTest {
                 createArgumentsForInvoke(7, "Setting logsEnabled to false.", DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, MockRunnable.class.getName(), List.of(), "run", false, null),
                 createArgumentsForInvoke(8, "Setting functionId to null.", null, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, MockRunnable.class.getName(), List.of(), "run", true, null),
                 createArgumentsForInvoke(9, "Setting parameter types to null.", DEFAULT_FUNCTION_ID, DEFAULT_EXECUTION_ID, DEFAULT_API_KEY, OK.value(), APPLICATION_JSON_VALUE, PolyCustomFunction.class.getName(), null, "execute", true, DEFAULT_RESULT),
-                createArgumentsForInvoke(10, "Private execution method (Delegates failure to the service layer).", PrivateMethodClass.class, List.of(), "get", null));
+                createArgumentsForInvoke(10, "Private execution method (Delegates failure to the service layer).", PrivateMethodClass.class, List.of(), "get", null),
+                createArgumentsForInvoke(11, "Function with primitive type argument.", IntFunction.class, List.of(int.class), "apply", "1"));
     }
 
     private static Arguments createArgumentsForInvoke(Integer caseNumber, String description, Class<?> functionClass, List<Class<?>> parameterTypes, String methodName, Object expectedBody, Object... arguments) {
@@ -110,7 +113,7 @@ public class InvocationControllerTest {
     }
 
     private static Arguments createArgumentsForTrigger(Object... arguments) {
-        List<Object> result = Arrays.stream(arguments).collect(Collectors.toList());
+        List<Object> result = Arrays.stream(arguments).collect(toList());
         result.add(2, "sample");
         return Arguments.of(result.toArray());
     }
