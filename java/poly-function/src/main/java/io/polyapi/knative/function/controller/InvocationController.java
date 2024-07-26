@@ -64,7 +64,7 @@ public class InvocationController {
     @Autowired
     private InvocationService invocationService;
 
-    @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = {APPLICATION_JSON_VALUE, TEXT_PLAIN_VALUE})
+    @PostMapping(consumes = APPLICATION_JSON_VALUE)
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
@@ -75,7 +75,7 @@ public class InvocationController {
                 .body(methodResult.getData().orElse(""));
     }
 
-    @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE, headers = "ce-id")
+    @PostMapping(consumes = APPLICATION_JSON_VALUE, headers = "ce-id")
     public ResponseEntity<TriggerEventResult> trigger(@RequestHeader HttpHeaders headers,
                                                       @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                                       @RequestHeader("ce-executionid") String executionId,
@@ -168,7 +168,12 @@ public class InvocationController {
                 log.debug("Method {} retrieved successfully.", functionMethod);
             }
             return invocationService.invokeFunction(functionClass, functionMethod, range(0, functionMethod.getParameters().length).boxed()
-                    .map(i -> Optional.ofNullable(arguments).filter(args -> args.size() > i).map(args -> args.get(i)).map(Object::toString).map(arg -> jsonParser.parseString(arg, functionMethod.getParameters()[i].getParameterizedType())).orElse(null))
+                    .map(i -> Optional.ofNullable(arguments)
+                            .filter(args -> args.size() > i)
+                            .map(args -> args.get(i))
+                            .map(Object::toString)
+                            .map(arg -> jsonParser.parseString(arg, functionMethod.getParameters()[i].getParameterizedType()))
+                            .orElse(null))
                     .toArray(), logsEnabled, executionId);
         } catch (NoSuchMethodException e) {
             throw new ExecutionMethodNotFoundException(methodName, parameterTypes, e);
