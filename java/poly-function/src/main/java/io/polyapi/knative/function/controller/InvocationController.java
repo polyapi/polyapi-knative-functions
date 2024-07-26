@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +30,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.function.Predicate.not;
@@ -36,6 +38,7 @@ import static java.util.stream.IntStream.range;
 import static org.springframework.http.HttpHeaders.*;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
+import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
 
 @Slf4j
 @Setter
@@ -64,10 +67,10 @@ public class InvocationController {
     @PostMapping(consumes = APPLICATION_JSON_VALUE)
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
-                                    @RequestHeader(name = ACCEPT, required = false, defaultValue = "DEFAULT") String accept,
+                                    @RequestHeader(name = CONTENT_TYPE, required = false, defaultValue = "DEFAULT") String contentType,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
-        log.error("Accept is {}.", accept);
+        log.error("Content type is {}.", contentType);
         InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
         return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
                 .header(CONTENT_TYPE, methodResult.getMetadata().getResponseContentType())
