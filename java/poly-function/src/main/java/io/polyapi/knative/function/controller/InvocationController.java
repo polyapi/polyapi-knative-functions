@@ -67,10 +67,8 @@ public class InvocationController {
     @PostMapping(consumes = APPLICATION_JSON_VALUE)
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
-                                    @RequestHeader(name = CONTENT_TYPE, required = false, defaultValue = "DEFAULT") String contentType,
                                     @RequestBody Map<String, List<JsonNode>> arguments) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
-        log.error("Content type is {}.", contentType);
         InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
         return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
                 .header(CONTENT_TYPE, methodResult.getMetadata().getResponseContentType())
