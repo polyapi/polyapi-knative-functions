@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -67,9 +68,9 @@ public class InvocationController {
     @PostMapping(consumes = APPLICATION_JSON_VALUE)
     public ResponseEntity<?> invoke(@RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                     @RequestHeader(name = "x-poly-execution-id", required = false, defaultValue = "") String executionId,
-                                    @RequestBody Map<String, List<JsonNode>> arguments) {
+                                    @RequestBody JsonNode requestBody) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
-        InvocationResult methodResult = invokeFunction(arguments.get("args"), logsEnabled, executionId);
+        InvocationResult methodResult = invokeFunction(parseArguments(requestBody), logsEnabled, executionId);
         return ResponseEntity.status(methodResult.getMetadata().getResponseStatusCode())
                 .header(CONTENT_TYPE, methodResult.getMetadata().getResponseContentType())
                 .body(methodResult.getData().orElse(""));
@@ -80,11 +81,11 @@ public class InvocationController {
                                                       @RequestHeader(name = "x-poly-do-log", required = false, defaultValue = "false") boolean logsEnabled,
                                                       @RequestHeader("ce-executionid") String executionId,
                                                       @RequestHeader("ce-environment") String environmentId,
-                                                      @RequestBody List<JsonNode> arguments) {
+                                                      @RequestBody JsonNode requestBody) {
         log.info("Poly logs are {}enabled for this function execution.", logsEnabled ? "" : "not ");
         Long start = System.currentTimeMillis();
         log.debug("Presence of 'ce-id' header indicates that the function is invoked from a trigger.");
-        InvocationResult invocationResult = invokeFunction(arguments, logsEnabled, executionId);
+        InvocationResult invocationResult = invokeFunction(parseArguments(requestBody), logsEnabled, executionId);
         log.debug("Handling response.");
         ResponseEntity<TriggerEventResult> result = ResponseEntity.ok()
                 .headers(headers)
@@ -107,6 +108,36 @@ public class InvocationController {
         result.getHeaders().forEach((key, value) -> log.trace("    \"{}\": \"{}\"", key, value));
         log.debug("Response handled successfully.");
         return result;
+    }
+
+    private List<JsonNode> parseArguments(JsonNode requestBody) {
+        if (requestBody == null || requestBody.isNull()) {
+            return null;
+        }
+        if (requestBody.isArray()) {
+            return toList(requestBody);
+        }
+        if (requestBody.isObject()) {
+            JsonNode argsNode = requestBody.get("args");
+            if (argsNode == null || argsNode.isNull()) {
+                return null;
+            }
+            if (argsNode.isArray()) {
+                return toList(argsNode);
+            }
+        }
+        throw invalidPayloadException(requestBody);
+    }
+
+    private List<JsonNode> toList(JsonNode node) {
+        List<JsonNode> result = new ArrayList<>(node.size());
+        node.forEach(result::add);
+        return result;
+    }
+
+    private JsonToObjectParsingException invalidPayloadException(JsonNode requestBody) {
+        return new JsonToObjectParsingException(requestBody.toString(), List.class,
+                new IllegalArgumentException("Expected request body to be an array or an object containing an 'args' array."));
     }
 
     @ExceptionHandler(PolyKNativeFunctionException.class)
