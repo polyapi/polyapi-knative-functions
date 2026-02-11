@@ -98,6 +98,30 @@ public class InvocationControllerTest {
         }).toList(), new InvocationResult(expectedBody, new PolyCustom(executionId, apiKey, responseStatusCode, responseContentType)), Map.of(CONTENT_TYPE, responseContentType));
     }
 
+    private static JsonNode createArgsObjectPayload(List<JsonNode> arguments) {
+        try {
+            return jsonParser.readTree(jsonParser.toJsonString(Map.of("args", arguments)));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static JsonNode createArgsObjectPayloadWithAuthData(List<JsonNode> arguments) {
+        try {
+            return jsonParser.readTree(jsonParser.toJsonString(Map.of("args", arguments, "authData", Map.of("tenantId", "test-tenant"))));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static JsonNode createArrayPayload(List<JsonNode> arguments) {
+        try {
+            return jsonParser.readTree(jsonParser.toJsonString(arguments));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     public static List<Arguments> triggerSource() {
         List<Arguments> arguments = new ArrayList<>();
@@ -171,7 +195,7 @@ public class InvocationControllerTest {
         Mockito.when(invocationService.invokeFunction(eq(Class.forName(Optional.ofNullable(functionQualifiedName).orElseGet(PolyCustomFunction.class::getName))), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()))).thenReturn(invocationResult);
         controller.setInvocationService(invocationService);
         controller.setJsonParser(jsonParser);
-        ResponseEntity<?> result = controller.invoke(logsEnabled, invocationResult.getMetadata().getExecutionId(), Map.of("args", arguments));
+        ResponseEntity<?> result = controller.invoke(logsEnabled, invocationResult.getMetadata().getExecutionId(), createArgsObjectPayload(arguments));
         assertThat(result.getBody(), equalTo(invocationResult.getData().orElse("")));
         assertThat(result.getHeaders().keySet(), equalTo(expectedHeaders.keySet()));
         if (expectedHeaders.containsKey(CONTENT_TYPE)) {
@@ -198,7 +222,7 @@ public class InvocationControllerTest {
         }
         controller.setInvocationService(invocationService);
         controller.setJsonParser(jsonParser);
-        Throwable exception = assertThrows(expectedException, () -> controller.invoke(logsEnabled, executionId, Map.of("args", arguments)));
+        Throwable exception = assertThrows(expectedException, () -> controller.invoke(logsEnabled, executionId, createArgsObjectPayload(arguments)));
         assertThat(exception.getMessage(), equalTo(expectedMessage));
     }
 
@@ -218,7 +242,7 @@ public class InvocationControllerTest {
         HttpHeaders headers = new HttpHeaders();
         headers.put("sample", List.of(UUID.randomUUID().toString()));
         headers.put(CONTENT_TYPE, List.of(invocationResult.getMetadata().getResponseContentType()));
-        ResponseEntity<TriggerEventResult> result = controller.trigger(headers, logsEnabled, invocationResult.getMetadata().getExecutionId(), environmentId, arguments);
+        ResponseEntity<TriggerEventResult> result = controller.trigger(headers, logsEnabled, invocationResult.getMetadata().getExecutionId(), environmentId, createArrayPayload(arguments));
         TriggerEventResult body = result.getBody();
         assertThat(body, not(nullValue()));
         assertThat(body.getContentType(), equalTo(APPLICATION_JSON_VALUE));
@@ -234,7 +258,21 @@ public class InvocationControllerTest {
         headers.forEach((key, value) -> expectedResultingHeaders.put(key, value.get(0)));
         assertThat(result.getHeaders().size(), equalTo(expectedResultingHeaders.size()));
         expectedResultingHeaders.forEach((key, value) -> assertThat(value, equalTo(result.getHeaders().getFirst(key))));
-        Mockito.verify(invocationService).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()));
+
+        ResponseEntity<TriggerEventResult> wrappedResult = controller.trigger(
+                headers,
+                logsEnabled,
+                invocationResult.getMetadata().getExecutionId(),
+                environmentId,
+                createArgsObjectPayloadWithAuthData(arguments));
+        TriggerEventResult wrappedBody = wrappedResult.getBody();
+        assertThat(wrappedBody, not(nullValue()));
+        assertThat(wrappedBody.getData(), equalTo(invocationResult.getData().orElse("")));
+        assertThat(wrappedBody.getStatusCode(), equalTo(invocationResult.getMetadata().getResponseStatusCode()));
+        assertThat(wrappedBody.getExecutionId(), equalTo(invocationResult.getMetadata().getExecutionId()));
+        assertThat(wrappedResult.getHeaders().getFirst("ce-type"), equalTo("trigger.response"));
+
+        Mockito.verify(invocationService, times(2)).invokeFunction(eq(Class.forName(functionQualifiedName)), any(), any(), eq(logsEnabled), eq(invocationResult.getMetadata().getExecutionId()));
     }
 
     @ParameterizedTest(name = "Case {0}: {1}")
